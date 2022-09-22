@@ -1,0 +1,55 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>11</LangVersion>
+    <Nullable>enable</Nullable>
+    <Configuration Condition="$(Configuration) == ''">Debug</Configuration>
+    <NoWarn>IDE0130;CA1416</NoWarn>
+    <ImplicitUsings>false</ImplicitUsings>
+
+    <!-- Set output paths -->
+    <SourceDir>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'Directory.Build.props'))</SourceDir>
+    <ArtifactsDir>$(SourceDir)\artifacts</ArtifactsDir>
+    <Artifacts>$(ArtifactsDir)\$(MSBuildProjectName)\$(Configuration)</Artifacts>
+
+    <OutputPath>$(Artifacts)\bin</OutputPath>
+    <BaseOutputPath>$(Artifacts)\obj</BaseOutputPath>
+    <PackageOutputPath>$(SourceDir)nuget</PackageOutputPath>
+    <!-- <DocumentationFile>$(ArtifactsDir)\$(MSBuildProjectName)\doc.xml</DocumentationFile> -->
+    <BaseIntermediateOutputPath>$(BaseOutputPath)</BaseIntermediateOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Panos Athanasiou</Authors>
+    <Copyright>Copyright (c) 2022 Panos Athanasiou</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/panoukos41/NoSQLite</PackageProjectUrl>
+    <PackageIconUrl></PackageIconUrl>
+    <DefaultPackageDescription>A thin wrapper above sqlite to use it as a nosql database.</DefaultPackageDescription>
+    <PackageDescription>$(DefaultPackageDescription)</PackageDescription>
+    <Owners>panoukos41</Owners>
+    <PackageTags>sqlite</PackageTags>
+    <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
+    <PackageReleaseNotes>$(RepositoryUrl)/releases</PackageReleaseNotes>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild> 
+    <!-- Publish the repository URL in the built .nupkg (in the NuSpec <Repository> element) -->
+     <PublishRepositoryUrl>true</PublishRepositoryUrl>  
+    <!-- Embed source files that are not tracked by the source control manager in the PDB -->
+    <!-- <EmbedUntrackedSources>true</EmbedUntrackedSources> -->
+    <!-- Include PDB in the built .nupkg -->
+     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder> 
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(SourceDir)\README.md" Pack="true" PackagePath="\" Condition="$(MSBuildProjectDirectory.Contains('src'))" />
+    <!-- <SourceRoot Include="$(MSBuildThisFileDirectory)/" /> -->
+  </ItemGroup>
+
+  <ItemGroup>
+      <!-- Use versions like this since -->
+     <PackageReference Include="Nerdbank.GitVersioning" Version="3.5.113" PrivateAssets="All" /> 
+     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" /> 
+  </ItemGroup>
+</Project>
