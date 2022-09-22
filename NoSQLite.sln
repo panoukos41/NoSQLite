@@ -1,0 +1,76 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.32912.340
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{1CB9024C-F693-466A-A960-806B871E6DFD}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "root", "root", "{4CB6779A-2488-4EF5-8FB3-1EB90B63A311}"
+	ProjectSection(SolutionItems) = preProject
+		.gitattributes = .gitattributes
+		.gitignore = .gitignore
+		Directory.Build.props = Directory.Build.props
+		global.json = global.json
+		LICENSE.md = LICENSE.md
+		README.md = README.md
+		version.json = version.json
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NoSQLite", "src\NoSQLite\NoSQLite.csproj", "{4CB52AF4-51A8-45D9-8BFD-F921189063A0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{C3F14F03-2367-47B9-BF89-4D028C29074A}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleApp", "samples\ConsoleApp\ConsoleApp.csproj", "{053B5452-DBE9-421A-80AC-E415F11CBAEC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ci", "ci", "{7C0251EF-9751-4494-ADF5-B6E226FFEFBC}"
+	ProjectSection(SolutionItems) = preProject
+		ci\build.ps1 = ci\build.ps1
+		ci\pack.ps1 = ci\pack.ps1
+		ci\test.ps1 = ci\test.ps1
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{0743F8BC-C025-42F2-943C-08BB38399EDF}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{A450CC69-06DB-4506-B76A-83BF556D959F}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\release.yaml = .github\workflows\release.yaml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{581BD499-7F2B-4255-B8E6-95F442B9C187}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NoSQLite.Test", "test\NoSQLite.Test\NoSQLite.Test.csproj", "{DD8B54C8-499F-4A46-BBDD-8F641940BF85}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4CB52AF4-51A8-45D9-8BFD-F921189063A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CB52AF4-51A8-45D9-8BFD-F921189063A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CB52AF4-51A8-45D9-8BFD-F921189063A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CB52AF4-51A8-45D9-8BFD-F921189063A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{053B5452-DBE9-421A-80AC-E415F11CBAEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{053B5452-DBE9-421A-80AC-E415F11CBAEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{053B5452-DBE9-421A-80AC-E415F11CBAEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{053B5452-DBE9-421A-80AC-E415F11CBAEC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DD8B54C8-499F-4A46-BBDD-8F641940BF85}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DD8B54C8-499F-4A46-BBDD-8F641940BF85}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DD8B54C8-499F-4A46-BBDD-8F641940BF85}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DD8B54C8-499F-4A46-BBDD-8F641940BF85}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4CB52AF4-51A8-45D9-8BFD-F921189063A0} = {1CB9024C-F693-466A-A960-806B871E6DFD}
+		{053B5452-DBE9-421A-80AC-E415F11CBAEC} = {C3F14F03-2367-47B9-BF89-4D028C29074A}
+		{7C0251EF-9751-4494-ADF5-B6E226FFEFBC} = {4CB6779A-2488-4EF5-8FB3-1EB90B63A311}
+		{0743F8BC-C025-42F2-943C-08BB38399EDF} = {4CB6779A-2488-4EF5-8FB3-1EB90B63A311}
+		{A450CC69-06DB-4506-B76A-83BF556D959F} = {0743F8BC-C025-42F2-943C-08BB38399EDF}
+		{DD8B54C8-499F-4A46-BBDD-8F641940BF85} = {581BD499-7F2B-4255-B8E6-95F442B9C187}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {600A3307-F265-4E32-B09A-73C7FC05B2D1}
+	EndGlobalSection
+EndGlobal
