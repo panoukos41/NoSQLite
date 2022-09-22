@@ -17,6 +17,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with: { fetch-depth: 0 }
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v2
@@ -28,16 +29,16 @@ jobs:
         with: { setAllVars: true }
 
       - name: Build
-        run: |
-          ./ci/build.ps1
+        shell: pwsh
+        run: ./ci/build.ps1
 
       - name: Test
-        run: |
-          ./ci/test.ps1
+        shell: pwsh
+        run: ./ci/test.ps1
 
       - name: Pack
-        run: |
-          ./ci/pack.ps1
+        shell: pwsh
+        run: ./ci/pack.ps1
 
       - name: Publish on NuGet
         env:
