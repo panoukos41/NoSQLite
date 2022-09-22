@@ -8,19 +8,19 @@ A thin wrapper above sqlite to use it as a nosql database.
 
 ## Getting Started
 
-All you need to is an instance of `NoSQLiteConnection`, the instance requires a `string` that is a full path to the database file and you can optionally provide your own `JsonSerializerOptions` to configure the JSON serialization/deserialization.
+All you need is an instance of `NoSQLiteConnection`. The instance requires a `string` that is a fully qualified path to the database file and you can also optionally provide your own `JsonSerializerOptions` to configure the JSON serialization/deserialization.
 
-`NoSQLiteConnection` create and open a connection when initialized so keep in mind that you will have to dispose it when you are done using the `Dispose` method of the `IDisposable` `interface`.
+`NoSQLiteConnection` creates and opens a connection when initialized so keep in mind that you will have to dispose it when you are done. Use the `Dispose` method of the `IDisposable interface`.
 
-In most scenarios you will create it and store it to use it until you should down your application.
+In most scenarios you will create it and store it for use until you shutdown your application.
 
 The `sqlite` database is configured with `journal_mode` set to `WAL`.
 
-### How It Works
+## How It Works
 
 It works by taking advantage of the [JSON1](https://www.sqlite.org/json1.html) through the [SQLitePCLRaw.bundle_e_sqlite3](https://www.nuget.org/packages/SQLitePCLRaw.bundle_e_sqlite3) nuget package that forces the correct version of sqlite to manipulate the documents, create indexes and more in the future!
 
-### Document Management
+## Document Management
 
 Example class that will be used below:
 ```csharp
@@ -37,7 +37,7 @@ and the same connection:
 var db = new NoSQLiteConnection("path to database file", "json options or null");
 ```
 
-#### Creating/Updating documents.
+### Create/Update documents.
 
 Creating or Updating a document happens from the same `insert` method, keep in mind that this always replaces the document with the new one.
 ```csharp
@@ -48,7 +48,7 @@ var panos = new Person
     Description = "C# dev"
 }
 
-db.Insert("panos", panos);
+db.Insert("panos", panos); // If it exists it is now replaced/updated.
 ```
 
 ### Get documents.
@@ -56,7 +56,7 @@ db.Insert("panos", panos);
 var doc = db.Get<Person>("panos");
 ```
 
-#### Deleting documents.
+#### Delete documents.
 ```csharp
 db.Remove("panos"); // Will remove the document.
 db.Remove("panos"); // Will still succeed even if the document doesn't exist.
