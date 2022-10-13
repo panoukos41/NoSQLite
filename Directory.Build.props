@@ -2,9 +2,9 @@
   <PropertyGroup>
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>true</ImplicitUsings>
     <Configuration Condition="$(Configuration) == ''">Debug</Configuration>
     <NoWarn>IDE0130;CA1416</NoWarn>
-    <ImplicitUsings>false</ImplicitUsings>
 
     <!-- Set output paths -->
     <SourceDir>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'Directory.Build.props'))</SourceDir>
