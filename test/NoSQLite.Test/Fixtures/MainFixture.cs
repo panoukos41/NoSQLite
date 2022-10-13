@@ -2,11 +2,13 @@
 
 namespace NoSQLite.Test.Collections;
 
+// Defining the collection and which Fixture to use for it.
 [CollectionDefinition(nameof(MainCollection))]
 public sealed class MainCollectionDefinition : ICollectionFixture<MainFixture>
 {
 }
 
+// Main class from which all tests inherit to be executed in the same context.
 [Collection(nameof(MainCollection))]
 public abstract class MainCollection
 {
@@ -29,7 +31,8 @@ public abstract class MainCollection
     };
 }
 
-public sealed class MainFixture : IDisposable
+// Shared data for all tests of MainCollection.
+public sealed class MainFixture : IAsyncLifetime
 {
     public MainFixture()
     {
@@ -38,8 +41,16 @@ public sealed class MainFixture : IDisposable
 
     public NoSQLiteConnection Db { get; }
 
-    public void Dispose()
+    public Task InitializeAsync()
+    {
+        Assert.True(File.Exists(Db.Path));
+        // todo: Create a lot of people data.
+        return Task.CompletedTask;
+    }
+
+    public Task DisposeAsync()
     {
         Db.Dispose();
+        return Task.CompletedTask;
     }
 }

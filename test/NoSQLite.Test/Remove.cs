@@ -40,10 +40,10 @@ public class Remove : MainCollection
 
         var func = () => Db.Remove(new[] { "many_1", "many_2", "many_3", "not_exist_1", "not_exist_2" });
 
+        func.Should().NotThrow();
+
         Db.Exists("many_1").Should().BeFalse();
         Db.Exists("many_2").Should().BeFalse();
         Db.Exists("many_3").Should().BeFalse();
-
-        func.Should().NotThrow();
     }
 }

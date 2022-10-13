@@ -12,8 +12,8 @@ public class Get : MainCollection
         var id = "item_that_exists";
         Db.Insert(id, Person);
 
-        var value = Db.Get<Person>(id);
-        var bytes = Db.GetBytes(id);
+        var value = Db.Find<Person>(id);
+        var bytes = Db.FindBytes(id);
 
         value.Should().NotBeNull();
         bytes.Should().NotBeNull();
@@ -24,8 +24,8 @@ public class Get : MainCollection
     {
         var id = "item_that_does_not_exist";
 
-        var value = Db.Get<Person>(id);
-        var bytes = Db.GetBytes(id);
+        var value = Db.Find<Person>(id);
+        var bytes = Db.FindBytes(id);
 
         value.Should().BeNull();
         bytes.Should().BeNull();
