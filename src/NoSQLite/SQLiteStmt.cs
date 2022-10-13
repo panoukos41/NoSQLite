@@ -5,11 +5,7 @@ namespace NoSQLite;
 
 using static SQLitePCL.raw;
 
-/// <summary>
-/// A thin wrapper to make working with the sqlite api easier.
-/// </summary>
-/// <remarks>Always use within a using statement to ensure <see cref="Dispose"/> is called.
-internal readonly ref struct SqliteStatement
+internal sealed class SQLiteStmt : IDisposable
 {
     private readonly sqlite3 db;
     private readonly sqlite3_stmt stmt;
@@ -19,7 +15,7 @@ internal readonly ref struct SqliteStatement
     /// </summary>
     /// <param name="db">The database that runs the statements.</param>
     /// <param name="sql">The sql to execute.</param>
-    public SqliteStatement(sqlite3 db, string sql)
+    public SQLiteStmt(sqlite3 db, string sql)
     {
         this.db = db;
         sqlite3_prepare_v2(db, sql, out stmt);
@@ -107,7 +103,7 @@ internal readonly ref struct SqliteStatement
     /// <summary>
     /// Get the error message the database has currently emmited.
     /// </summary>
-    /// <returns></returns>
+    /// <returns>The error message from the database.</returns>
     public string Error() => sqlite3_errmsg(db).utf8_to_string();
 
     /// <summary>
