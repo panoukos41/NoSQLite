@@ -8,14 +8,14 @@ public static class INDEX
     {
         var indexName = "name_index";
 
-        var exists = db.Indexes.Exists(indexName);
+        var exists = db.IndexExists(indexName);
 
-        db.Indexes.Create(indexName, "name");
+        db.CreateIndex(indexName, "name");
 
-        exists = db.Indexes.Exists(indexName);
+        exists = db.IndexExists(indexName);
 
-        db.Indexes.Delete(indexName);
+        db.DeleteIndex(indexName);
 
-        exists = db.Indexes.Exists(indexName);
+        exists = db.IndexExists(indexName);
     }
 }

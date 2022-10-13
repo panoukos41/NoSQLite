@@ -31,10 +31,10 @@ public static class CRUD
 
         var exists = db.Exists("0");
 
-        var panos2 = db.Get<Person>("0");
-        var john2 = db.Get<Person>("1");
+        var panos2 = db.Find<Person>("0");
+        var john2 = db.Find<Person>("1");
 
-        var people = db.Get<Person>(new[] { "0", "1" }).ToArray();
+        var people = db.Find<Person>(new[] { "0", "1" }).ToArray();
 
         db.Remove("0");
         db.Remove(new[] { "0", "1" });
@@ -57,7 +57,7 @@ public static class CRUD
 
         var exists = db.Exists("people");
 
-        var people2 = db.Get<Person[]>("people");
+        var people2 = db.Find<Person[]>("people");
 
         db.Remove("people");
 
