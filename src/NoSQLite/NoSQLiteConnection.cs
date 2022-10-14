@@ -122,6 +122,26 @@ public sealed class NoSQLiteConnection : IDisposable
     /// </summary>
     public JsonSerializerOptions? JsonOptions { get; set; }
 
+    /// <summary>
+    /// Deletes all rows from a table.
+    /// </summary>
+    public void Clear()
+    {
+        sqlite3_exec(db, $"DELETE FROM {Table};");
+    }
+
+    /// <summary>
+    /// Drops the table and then Creates it again. This will delete all indexes views etc.
+    /// </summary>
+    /// <remarks>See <see href="https://sqlite.org/lang_droptable.html"/> for more info.</remarks>
+    public void DropAndCreate()
+    {
+        sqlite3_exec(db, $"DROP TABLE IF EXISTS {Table};");
+        var result = CreateTable();
+
+        db.CheckResult(result, $"Could not create '{Table}' database table");
+    }
+
     #region Find
 
     private readonly Lazy<SQLiteStmt> existsStmt;
