@@ -273,6 +273,7 @@ public sealed class NoSQLiteConnection : IDisposable
 
     public void Insert<T>(IDictionary<string, T> keyValuePairs)
     {
+        using var transaction = new SQLiteTransaction(db);
         foreach (var (id, obj) in keyValuePairs)
         {
             Insert(id, obj);
@@ -330,6 +331,7 @@ public sealed class NoSQLiteConnection : IDisposable
     /// <param name="ids">The ids to delete.</param>
     public void Remove(IEnumerable<string> ids)
     {
+        using var transaction = new SQLiteTransaction(db);
         foreach (var id in ids)
         {
             Remove(id);
