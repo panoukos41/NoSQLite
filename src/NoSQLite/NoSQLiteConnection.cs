@@ -1,4 +1,4 @@
-﻿using SQLitePCL;
+using SQLitePCL;
 using System.Text.Json;
 
 namespace NoSQLite;
@@ -140,6 +140,11 @@ public sealed class NoSQLiteConnection : IDisposable
         var result = CreateTable();
 
         db.CheckResult(result, $"Could not create '{Table}' database table");
+    }
+
+    public void Checkpoint()
+    {
+        sqlite3_wal_checkpoint(db, null);
     }
 
     #region Find
