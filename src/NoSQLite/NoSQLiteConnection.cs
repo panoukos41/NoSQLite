@@ -1,4 +1,4 @@
-using SQLitePCL;
+﻿using SQLitePCL;
 using System.Text.Json;
 
 namespace NoSQLite;
@@ -206,7 +206,7 @@ public sealed class NoSQLiteConnection : IDisposable
     /// <param name="throwIfNotFound">True to ignore missing ids</param>
     /// <returns>A list of <typeparamref name="T"/> objects.</returns>
     /// <exception cref="KeyNotFoundException">When <paramref name="throwIfNotFound"/> is true and a key is not found.</exception>
-    public IEnumerable<T> Find<T>(IEnumerable<string> ids, bool throwIfNotFound = true)
+    public IEnumerable<T> FindMany<T>(IEnumerable<string> ids, bool throwIfNotFound = true)
     {
         foreach (var id in ids)
         {
