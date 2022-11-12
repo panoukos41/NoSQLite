@@ -14,10 +14,10 @@ public abstract class MainCollection
 {
     public MainCollection(MainFixture fixture)
     {
-        Db = fixture.Db;
+        Db = fixture.Connection.GetTable();
     }
 
-    public NoSQLiteConnection Db { get; }
+    public NoSQLiteTable Db { get; }
 
     // todo: Provide random people generation or many random people.
 
@@ -36,21 +36,21 @@ public sealed class MainFixture : IAsyncLifetime
 {
     public MainFixture()
     {
-        Db = new NoSQLiteConnection(Path.Combine(Environment.CurrentDirectory, "test.sqlite3"));
+        Connection = new NoSQLiteConnection(Path.Combine(Environment.CurrentDirectory, "test.sqlite3"));
     }
 
-    public NoSQLiteConnection Db { get; }
+    public NoSQLiteConnection Connection { get; }
 
     public Task InitializeAsync()
     {
-        Assert.True(File.Exists(Db.Path));
+        Assert.True(File.Exists(Connection.Path));
         // todo: Create a lot of people data.
         return Task.CompletedTask;
     }
 
     public Task DisposeAsync()
     {
-        Db.Dispose();
+        Connection.Dispose();
         return Task.CompletedTask;
     }
 }

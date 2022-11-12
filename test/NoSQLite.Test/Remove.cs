@@ -31,14 +31,14 @@ public class Remove : MainCollection
     [Fact]
     public void Many_items_that_exist_and_dont()
     {
-        Db.Insert(new Dictionary<string, Person>
+        Db.InsertMany(new Dictionary<string, Person>
         {
             ["many_1"] = Person,
             ["many_2"] = Person,
             ["many_3"] = Person,
         });
 
-        var func = () => Db.Remove(new[] { "many_1", "many_2", "many_3", "not_exist_1", "not_exist_2" });
+        var func = () => Db.RemoveMany(new[] { "many_1", "many_2", "many_3", "not_exist_1", "not_exist_2" });
 
         func.Should().NotThrow();
 

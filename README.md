@@ -4,21 +4,31 @@
 [![NuGet](https://buildstats.info/nuget/P41.NoSQLite?includePreReleases=true)](https://www.nuget.org/packages/P41.NoSQLite)
 [![MIT License](https://img.shields.io/apm/l/atomic-design-ui.svg?)](https://github.com/panoukos41/NoSQLite/blob/main/LICENSE.md)
 
-A thin wrapper above sqlite to use it as a nosql database.
+A thin wrapper above sqlite using the [`JSON1`](https://www.sqlite.org/json1.html) apis turn it into a [`NOSQL`](https://en.wikipedia.org/wiki/NoSQL) database.
+
+This library references and uses [`SQLitePCLRaw.bundle_e_sqlite3`](https://www.nuget.org/packages/SQLitePCLRaw.bundle_e_sqlite3) version `2.1.2` and later witch ensures that the [`JSON1 APIS`](https://www.sqlite.org/json1.html) are present.
+
+The library executes `Batteries.Init();` for you when a connection is first initialized.
 
 ## Getting Started
 
-All you need is an instance of `NoSQLiteConnection`. The instance requires a `string` that is a fully qualified path to the database file and you can also optionally provide your own `JsonSerializerOptions` to configure the JSON serialization/deserialization.
+Create an instance of `NoSQLiteConnection`.
+```csharp
+var connection = new NoSQLiteConnection(
+    "path to database file", // Required
+    json_options)            // Optional JsonSerializerOptions
+```
 
-`NoSQLiteConnection` creates and opens a connection when initialized so keep in mind that you will have to dispose it when you are done. Use the `Dispose` method of the `IDisposable interface`.
+The connection configures the `PRAGMA journal_mode` to be [`WAL`](https://www.sqlite.org/wal.html)
 
-In most scenarios you will create it and store it for use until you shutdown your application.
+The connection manages an `sqlite3` object when initialized. *You should always dispose it when you are done so that the databases flashes `WAL` files* but you can also ignore it ¯\ (ツ)/¯.
 
-The `sqlite` database is configured with `journal_mode` set to `WAL`.
+## Tables
 
-## How It Works
+You get a table using `connection.GetTable()` you can optionaly provide a table name or leave it as it is to get the default `documents` table.
+> Tables are created if they do not exist.
 
-It works by taking advantage of the [JSON1](https://www.sqlite.org/json1.html) through the [SQLitePCLRaw.bundle_e_sqlite3](https://www.nuget.org/packages/SQLitePCLRaw.bundle_e_sqlite3) nuget package that forces the correct version of sqlite to manipulate the documents, create indexes and more in the future!
+Tables are managed by their connections so you don't have to worry about disposing. If you request a table multiple times *(eg: the same name)* you will always get the same `Instance`.
 
 ## Document Management
 
@@ -31,15 +41,16 @@ public class Person
     public string? Description { get; set; }
 }
 ```
-
-and the same connection:
 ```csharp
-var db = new NoSQLiteConnection("path to database file", "json options or null");
+var connection = new NoSQLiteConnection("path to database file", "json options or null");
+```
+```csharp
+var docs = connection.GetTable();
 ```
 
 ### Create/Update documents.
 
-Creating or Updating a document happens from the same `insert` method, keep in mind that this always replaces the document with the new one.
+Creating or Updating a document happens from the same `Insert` method, keep in mind that this always replaces the document with the new one.
 ```csharp
 var panos = new Person
 {
@@ -48,18 +59,18 @@ var panos = new Person
     Description = "C# dev"
 }
 
-db.Insert("panos", panos); // If it exists it is now replaced/updated.
+docs.Insert("panos", panos); // If it exists it is now replaced/updated.
 ```
 
 ### Get documents.
 ```csharp
-var doc = db.Get<Person>("panos");
+var doc = docs.Get<Person>("panos"); // Get the document or null.
 ```
 
 #### Delete documents.
 ```csharp
-db.Remove("panos"); // Will remove the document.
-db.Remove("panos"); // Will still succeed even if the document doesn't exist.
+docs.Remove("panos"); // Will remove the document.
+docs.Remove("panos"); // Will still succeed even if the document doesn't exist.
 ```
 
 ## Build
