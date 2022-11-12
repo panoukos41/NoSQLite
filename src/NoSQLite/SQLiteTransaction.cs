@@ -15,7 +15,7 @@ internal ref struct SQLiteTransaction
     /// </summary>
     /// <param name="db">The database to run the transaction on.</param>
     /// <param name="begin">True to begin the transaction immediately</param>
-    /// <remarks>Use in a <see langword="using"/> statement to execute <see cref="Commit"/> it manually.</remarks>
+    /// <remarks>Use in a <see langword="using"/> statement to execute <see cref="Commit"/> automatically when disposed.</remarks>
     public SQLiteTransaction(sqlite3 db, bool begin = true)
     {
         this.db = db;
