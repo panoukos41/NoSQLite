@@ -168,10 +168,33 @@ public sealed class NoSQLiteTable : IDisposable
         {
             var doc = Find<T>(id);
 
-            Throw.KeyNotFound(throwIfNotFound && doc is null, $"Could not locate the Id '{id}'");
-
-            yield return doc!;
+            if (doc is null)
+            {
+                Throw.KeyNotFound(throwIfNotFound, $"Could not locate the Id '{id}'");
+                continue;
+            }
+            yield return doc;
         }
+    }
+
+    /// <summary>
+    /// Get Id - <typeparamref name="T"/> pairs.
+    /// If an object doesn't exist it will have a null value.
+    /// </summary>
+    /// <typeparam name="T">The type the objects will deserialize to.</typeparam>
+    /// <param name="ids">The ids to search for.</param>
+    /// <returns>An enumerable of Id - <typeparamref name="T"/> object pairs.</returns>
+    /// <remarks>Duplicate keys are ignored.</remarks>
+    public IDictionary<string, T?> FindPairs<T>(IEnumerable<string> ids)
+    {
+        var dictionary = new Dictionary<string, T?>();
+        foreach (var id in ids)
+        {
+            if (dictionary.ContainsKey(id)) continue;
+
+            dictionary.Add(id, Find<T>(id));
+        }
+        return dictionary;
     }
 
     /// <summary>
@@ -212,10 +235,32 @@ public sealed class NoSQLiteTable : IDisposable
         {
             var bytes = FindBytes(id);
 
-            Throw.KeyNotFound(throwIfNotFound && bytes is null, $"Could not locate the Id '{id}'");
-
-            yield return bytes!;
+            if (bytes is null)
+            {
+                Throw.KeyNotFound(throwIfNotFound, $"Could not locate the Id '{id}'");
+                continue;
+            }
+            yield return bytes;
         }
+    }
+
+    /// <summary>
+    /// Get Id - byte array pairs.
+    /// If an object doesn't exist it will have a null value
+    /// for the corresponding Id in the dictionary.
+    /// </summary>
+    /// <param name="ids">The ids to search for.</param>
+    /// <returns>A dictionary of Id - <typeparamref name="T"/> object pairs.</returns>
+    /// <remarks>Duplicate keys are just put on the key again.</remarks>
+    public IDictionary<string, byte[]?> FindBytesPairs(IEnumerable<string> ids)
+    {
+        var pairs = new Dictionary<string, byte[]?>();
+        foreach (var id in ids)
+        {
+            var bytes = FindBytes(id);
+            pairs[id] = bytes;
+        }
+        return pairs;
     }
 
     #endregion
