@@ -4,8 +4,10 @@ namespace ConsoleApp;
 
 public static class INDEX
 {
-    public static void Execute(NoSQLiteConnection db)
+    public static void Execute(NoSQLiteConnection connection)
     {
+        var db = connection.GetTable();
+
         var indexName = "name_index";
 
         var exists = db.IndexExists(indexName);

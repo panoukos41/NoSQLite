@@ -1,13 +1,20 @@
 ﻿global using ConsoleApp.Data;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Running;
 using ConsoleApp;
 using NoSQLite;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+
+//BenchmarkRunner.Run<Benchy>();
+
+//return;
+
 var stopwatch = Stopwatch.StartNew();
 
-var db = new NoSQLiteConnection(
+var connection = new NoSQLiteConnection(
     Path.Combine(Environment.CurrentDirectory, "console.sqlite3"),
     new JsonSerializerOptions
     {
@@ -19,22 +26,21 @@ stopwatch.Stop();
 Console.WriteLine($"Open elapsed time: {stopwatch.ElapsedMilliseconds}");
 
 Console.WriteLine($"""
-       Path: {db.Path}
-      Table: {db.Table}
-    Version: {db.Version}
+       Path: {connection.Path}
+    Version: {connection.Version}
     """);
 
 stopwatch.Restart();
 
-CRUD.Objects(db);
-CRUD.Lists(db);
-INDEX.Execute(db);
+CRUD.Objects(connection);
+CRUD.Lists(connection);
+INDEX.Execute(connection);
 
 stopwatch.Stop();
 Console.WriteLine($"Operation time: {stopwatch.ElapsedMilliseconds}");
 
 stopwatch.Restart();
-db.Dispose();
+connection.Dispose();
 
 stopwatch.Stop();
 Console.WriteLine($"Close elapsed time: {stopwatch.ElapsedMilliseconds}");

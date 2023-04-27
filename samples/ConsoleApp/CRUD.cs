@@ -4,8 +4,9 @@ namespace ConsoleApp;
 
 public static class CRUD
 {
-    public static void Objects(NoSQLiteConnection db)
+    public static void Objects(NoSQLiteConnection connection)
     {
+        var db = connection.GetTable();
         // objects
         var panos = new Person
         {
@@ -23,7 +24,7 @@ public static class CRUD
         db.Insert("0", panos);
         db.Insert("1", john);
 
-        db.Insert(new Dictionary<string, Person>
+        db.InsertMany(new Dictionary<string, Person>
         {
             ["0"] = panos,
             ["1"] = john
@@ -34,17 +35,19 @@ public static class CRUD
         var panos2 = db.Find<Person>("0");
         var john2 = db.Find<Person>("1");
 
-        var people = db.Find<Person>(new[] { "0", "1" }).ToArray();
+        var people = db.FindMany<Person>(new[] { "0", "1" }).ToArray();
 
         db.Remove("0");
-        db.Remove(new[] { "0", "1" });
+        db.RemoveMany(new[] { "0", "1" });
 
         db.Insert("0", panos);
         db.Insert("1", john);
     }
 
-    public static void Lists(NoSQLiteConnection db)
+    public static void Lists(NoSQLiteConnection connection)
     {
+        var db = connection.GetTable();
+
         var people = new[]
         {
             new Person{ Name = "person1", },
