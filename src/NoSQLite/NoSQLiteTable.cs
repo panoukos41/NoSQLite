@@ -1,4 +1,4 @@
-using SQLitePCL;
+﻿using SQLitePCL;
 using System.Text.Json;
 
 namespace NoSQLite;
@@ -29,13 +29,32 @@ public sealed class NoSQLiteTable : IDisposable
 
         #region Lazy statment initialization
 
+        countStmt = new(() =>
+        {
+            var stmt = new SQLiteStmt(db, $"""
+                SELECT count(*) FROM "{Table}";
+                """);
+
+            disposables.Add(stmt);
+            return stmt;
+        });
+
         existsStmt = new(() =>
         {
             var stmt = new SQLiteStmt(db, $"""
-                SELECT count(*) FROM {Table}
+                SELECT count(*) FROM "{Table}"
                 WHERE id is ?;
                 """);
 
+            disposables.Add(stmt);
+            return stmt;
+        });
+
+        allStmt = new(() =>
+        {
+            var stmt = new SQLiteStmt(db, $"""
+                SELECT json FROM "{Table}";
+                """);
             disposables.Add(stmt);
             return stmt;
         });
@@ -44,7 +63,7 @@ public sealed class NoSQLiteTable : IDisposable
         {
             var stmt = new SQLiteStmt(db, $"""
                 SELECT json
-                FROM {Table}
+                FROM "{Table}"
                 WHERE id is ?;
                 """);
 
@@ -55,7 +74,7 @@ public sealed class NoSQLiteTable : IDisposable
         insertStmt = new(() =>
         {
             var stmt = new SQLiteStmt(db, $"""
-                REPLACE INTO {Table}
+                REPLACE INTO "{Table}"
                 VALUES (?, json(?));
                 """);
 
@@ -66,7 +85,7 @@ public sealed class NoSQLiteTable : IDisposable
         removeStmt = new(() =>
         {
             var stmt = new SQLiteStmt(db, $"""
-                DELETE FROM {Table}
+                DELETE FROM "{Table}"
                 WHERE id is ?;
                 """);
 
@@ -150,7 +169,9 @@ public sealed class NoSQLiteTable : IDisposable
 
             var value = stmt.ColumnInt(0);
             stmt.Reset();
-            return value == 1;
+            return value != 0;
+        }
+    }
 
     private readonly Lazy<SQLiteStmt> allStmt;
 
@@ -372,6 +393,7 @@ public sealed class NoSQLiteTable : IDisposable
 
     public void InsertBytesMany(IDictionary<string, byte[]> keyValuePairs)
     {
+        using var transaction = new SQLiteTransaction(db);
         foreach (var (id, obj) in keyValuePairs)
         {
             InsertBytes(id, obj);
@@ -426,15 +448,14 @@ public sealed class NoSQLiteTable : IDisposable
     {
         string sql = $"""
             SELECT count(*) FROM sqlite_master
-            WHERE type='index' and name='{Table}_{indexName}';
+            WHERE type='index' and name="{Table}_{indexName}";
             """;
 
         using var stmt = new SQLiteStmt(db, sql);
-        stmt.BindText(1, indexName);
         stmt.Step();
 
         var value = stmt.ColumnInt(0);
-        return value == 1;
+        return value != 0;
     }
 
     /// <summary>
@@ -447,12 +468,11 @@ public sealed class NoSQLiteTable : IDisposable
     public void CreateIndex(string indexName, string parameter)
     {
         string sql = $"""
-            CREATE INDEX IF NOT EXISTS '{Table}_{indexName}'
-            ON {Table}(json ->> '$.{parameter}');
+            CREATE INDEX IF NOT EXISTS "{Table}_{indexName}"
+            ON "{Table}"(json ->> '$.{parameter}');
             """;
 
-        using var stmt = new SQLiteStmt(db, sql);
-        stmt.Step();
+        sqlite3_exec(db, sql);
     }
 
     /// <summary>
@@ -475,11 +495,10 @@ public sealed class NoSQLiteTable : IDisposable
     public void DeleteIndex(string indexName)
     {
         string sql = $"""
-            DROP INDEX IF EXISTS '{Table}_{indexName}'
+            DROP INDEX IF EXISTS "{Table}_{indexName}"
             """;
 
-        using var stmt = new SQLiteStmt(db, sql);
-        stmt.Step();
+        sqlite3_exec(db, sql);
     }
 
     #endregion
@@ -499,10 +518,10 @@ public sealed class NoSQLiteTable : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
+        Connection.tables.Remove(Table);
         if (disposables.Count <= 0) return;
 
         foreach (var d in disposables) d.Dispose();
         disposables.Clear();
-        Connection.tables.Remove(Table);
     }
 }

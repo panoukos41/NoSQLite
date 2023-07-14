@@ -1,4 +1,4 @@
-using SQLitePCL;
+﻿using SQLitePCL;
 using System.Buffers;
 using System.Text.Json;
 
@@ -88,7 +88,7 @@ public sealed class NoSQLiteConnection : IDisposable
     public void CreateTable(string table)
     {
         var result = sqlite3_exec(db, $"""
-            CREATE TABLE IF NOT EXISTS {table} (
+            CREATE TABLE IF NOT EXISTS '{table}' (
                 "id"        TEXT NOT NULL UNIQUE,
                 "json"      TEXT NOT NULL,
                 PRIMARY KEY("id")
@@ -103,7 +103,7 @@ public sealed class NoSQLiteConnection : IDisposable
     /// </summary>
     public void Clear(string table)
     {
-        sqlite3_exec(db, $"DELETE FROM {table};");
+        sqlite3_exec(db, $"""DELETE FROM "{table}";""");
     }
 
     /// <summary>
@@ -112,7 +112,7 @@ public sealed class NoSQLiteConnection : IDisposable
     /// <remarks>See <see href="https://sqlite.org/lang_droptable.html"/> for more info.</remarks>
     public void DropAndCreate(string table)
     {
-        sqlite3_exec(db, $"DROP TABLE IF EXISTS {table};");
+        sqlite3_exec(db, $"""DROP TABLE IF EXISTS "{table}";""");
         CreateTable(table);
     }
 
@@ -122,7 +122,7 @@ public sealed class NoSQLiteConnection : IDisposable
     /// <remarks>See <see href="https://sqlite.org/c3ref/wal_checkpoint.html"/> for more info.</remarks>
     public void Checkpoint()
     {
-        sqlite3_wal_checkpoint(db, null);
+        sqlite3_wal_checkpoint(db, Name);
     }
 
     /// <inheritdoc/>
