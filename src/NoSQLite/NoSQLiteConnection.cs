@@ -1,4 +1,4 @@
-﻿using SQLitePCL;
+using SQLitePCL;
 using System.Buffers;
 using System.Text.Json;
 
@@ -36,6 +36,7 @@ public sealed class NoSQLiteConnection : IDisposable
         SetJournalMode();
 
         Version = sqlite3_libversion().utf8_to_string();
+        Name = System.IO.Path.GetFileName(databasePath);
         Path = databasePath;
         JsonOptions = jsonOptions;
         tables = new();
@@ -48,6 +49,11 @@ public sealed class NoSQLiteConnection : IDisposable
     /// All the tables that belong to this Connection.
     /// </summary>
     public IReadOnlyCollection<NoSQLiteTable> Tables => tables.Values;
+
+    /// <summary>
+    /// The database name.
+    /// </summary>
+    public string Name { get; }
 
     /// <summary>
     /// Gets the database path used by this connection.
