@@ -52,6 +52,14 @@ internal sealed class SQLiteStmt : IDisposable
     public int ColumnInt(int index) => sqlite3_column_int(stmt, index);
 
     /// <summary>
+    /// Get the value of a number column as <see cref="int"/>.
+    /// </summary>
+    /// <remarks>Index starts from 0.</remarks>
+    /// <param name="index">The column to read the value from, starting from 0.</param>
+    /// <returns>The column value as <see cref="int"/>.</returns>
+    public long ColumnLong(int index) => sqlite3_column_int64(stmt, index);
+
+    /// <summary>
     /// Get the value of a text column as <see cref="string"/>.
     /// </summary>
     /// <remarks>Index starts from 0.</remarks>

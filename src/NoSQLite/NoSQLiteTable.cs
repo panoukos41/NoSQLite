@@ -1,4 +1,4 @@
-﻿using SQLitePCL;
+using SQLitePCL;
 using System.Text.Json;
 
 namespace NoSQLite;
@@ -11,7 +11,7 @@ using static SQLitePCL.raw;
 [Preserve(AllMembers = true)]
 public sealed class NoSQLiteTable : IDisposable
 {
-    private readonly List<IDisposable> disposables = new(4);
+    private readonly List<IDisposable> disposables = new(6);
     private readonly sqlite3 db;
 
     internal NoSQLiteTable(string table, NoSQLiteConnection connection)
@@ -103,7 +103,35 @@ public sealed class NoSQLiteTable : IDisposable
     /// <remarks>See <see href="https://sqlite.org/lang_droptable.html"/> for more info.</remarks>
     public void DropAndCreate() => Connection.DropAndCreate(Table);
 
-    #region Find
+    #region Basic
+
+    private readonly Lazy<SQLiteStmt> countStmt;
+
+    public int Count()
+    {
+        var stmt = countStmt.Value;
+        lock (countStmt)
+        {
+            stmt.Step();
+
+            var count = stmt.ColumnInt(0);
+            stmt.Reset();
+            return count;
+        }
+    }
+
+    public long LongCount()
+    {
+        var stmt = countStmt.Value;
+        lock (countStmt)
+        {
+            stmt.Step();
+
+            var count = stmt.ColumnLong(0);
+            stmt.Reset();
+            return count;
+        }
+    }
 
     private readonly Lazy<SQLiteStmt> existsStmt;
 
@@ -123,8 +151,52 @@ public sealed class NoSQLiteTable : IDisposable
             var value = stmt.ColumnInt(0);
             stmt.Reset();
             return value == 1;
+
+    private readonly Lazy<SQLiteStmt> allStmt;
+
+    public IEnumerable<T> All<T>()
+    {
+        var stmt = allStmt.Value;
+        lock (allStmt)
+        {
+            start:
+            var result = stmt.Step();
+
+            if (result is not SQLITE_ROW)
+            {
+                stmt.Reset();
+                yield break;
+            }
+
+            var value = stmt.ColumnDeserialize<T>(0, JsonOptions);
+            yield return value!;
+            goto start;
         }
     }
+
+    public IEnumerable<byte[]> AllBytes()
+    {
+        var stmt = allStmt.Value;
+        lock (allStmt)
+        {
+            start:
+            var result = stmt.Step();
+
+            if (result is not SQLITE_ROW)
+            {
+                stmt.Reset();
+                yield break;
+            }
+
+            var bytes = stmt.ColumnBlob(0).ToArray();
+            yield return bytes;
+            goto start;
+        }
+    }
+
+    #endregion
+
+    #region Find
 
     private readonly Lazy<SQLiteStmt> findStmt;
 
