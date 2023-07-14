@@ -38,7 +38,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{581BD499-7F2B-4255-B8E6-95F442B9C187}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NoSQLite.Test", "test\NoSQLite.Test\NoSQLite.Test.csproj", "{DD8B54C8-499F-4A46-BBDD-8F641940BF85}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NoSQLite.Test", "test\NoSQLite.Test\NoSQLite.Test.csproj", "{DD8B54C8-499F-4A46-BBDD-8F641940BF85}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
