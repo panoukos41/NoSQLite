@@ -459,20 +459,23 @@ public sealed class NoSQLiteTable : IDisposable
     }
 
     /// <summary>
-    /// Create an index on a json parameter using the <b> ->> </b> opperator.
+    /// Create an index on a json parameter using the <b> json_extract(json, '$.param') </b> opperator.
     /// Parameter can include nested json values eg: assets.house.location
     /// </summary>
     /// <param name="indexName">The name of the index. If this name exists the index won't be created.</param>
     /// <param name="parameter">The json parameter to create the index for.</param>
-    /// <remarks>Index on sqlite is always <see cref="Table"/>_<paramref name="indexName"/></remarks>
-    public void CreateIndex(string indexName, string parameter)
+    /// <remarks>
+    /// Parameter names are case sensitive.<br/>
+    /// Index name on sqlite will always be created as <see cref="Table"/>_<paramref name="indexName"/>
+    /// </remarks>
+    public bool CreateIndex(string indexName, string parameter)
     {
         string sql = $"""
-            CREATE INDEX IF NOT EXISTS "{Table}_{indexName}"
-            ON "{Table}"(json ->> '$.{parameter}');
+            CREATE INDEX "{Table}_{indexName}"
+            ON "{Table}"(json_extract("json", '$.{parameter}'));
             """;
 
-        sqlite3_exec(db, sql);
+        return sqlite3_exec(db, sql) == SQLITE_OK;
     }
 
     /// <summary>
@@ -481,7 +484,7 @@ public sealed class NoSQLiteTable : IDisposable
     /// <param name="indexName">The name of the index.</param>
     /// <param name="parameter">The json parameter to update the index for.</param>
     /// <remarks>Index on sqlite is always <see cref="Table"/>_<paramref name="indexName"/></remarks>
-    public void UpdateIndex(string indexName, string parameter)
+    public void RecreateIndex(string indexName, string parameter)
     {
         DeleteIndex(indexName);
         CreateIndex(indexName, parameter);
@@ -492,13 +495,13 @@ public sealed class NoSQLiteTable : IDisposable
     /// </summary>
     /// <param name="indexName">The name of the index.</param>
     /// <remarks>Index on sqlite is always <see cref="Table"/>_<paramref name="indexName"/></remarks>
-    public void DeleteIndex(string indexName)
+    public bool DeleteIndex(string indexName)
     {
         string sql = $"""
-            DROP INDEX IF EXISTS "{Table}_{indexName}"
+            DROP INDEX "{Table}_{indexName}"
             """;
 
-        sqlite3_exec(db, sql);
+        return sqlite3_exec(db, sql) == SQLITE_OK;
     }
 
     #endregion
