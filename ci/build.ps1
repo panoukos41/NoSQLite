@@ -7,7 +7,7 @@ param (
 
 $projects = @(
     "./src/NoSQLite"
-    #"./test/NoSQLite.Test"
+    "./test/NoSQLite.Test"
 )
 
 foreach ($project in $projects) {
