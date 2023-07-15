@@ -4,16 +4,16 @@ namespace NoSQLite.Test.Abstractions;
 
 public abstract class TestBase<TTestClass> : IClassFixture<TestFixture<TTestClass>>
 {
-    private readonly TestFixture<TTestClass> fixture;
+    protected TestFixture<TTestClass> Fixture { get; }
 
     public TestBase(TestFixture<TTestClass> fixture)
     {
-        this.fixture = fixture;
+        Fixture = fixture;
     }
 
     public NoSQLiteTable GetTable([CallerMemberName] string? caller = null)
     {
-        return fixture.Connection.GetTable($"{caller}_{Guid.NewGuid()}");
+        return Fixture.Connection.GetTable($"{caller}_{Guid.NewGuid()}");
     }
 
     public NoSQLiteTable GetTable<T>(IDictionary<string, T> initPairs, [CallerMemberName] string? caller = null)
