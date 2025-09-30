@@ -1,55 +1,55 @@
 <Project>
+
   <PropertyGroup>
-    <LangVersion>11</LangVersion>
+    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>true</ImplicitUsings>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <Configuration Condition="$(Configuration) == ''">Debug</Configuration>
-    <NoWarn>IDE0130;CA1416</NoWarn>
+    <NoWarn>$(NoWarn);CS8509;IDE0039;IDE0130;IDE0290;IDE0060;RZ10012;IDE0052;BL0007;NU5128</NoWarn>
+    <WarningsAsErrors>$(WarningsAsErrors);RZ2012;</WarningsAsErrors>
 
-    <!-- Set output paths -->
-    <SourceDir>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'Directory.Build.props'))</SourceDir>
-    <ArtifactsDir>$(SourceDir)\artifacts</ArtifactsDir>
-    <Artifacts>$(ArtifactsDir)\$(MSBuildProjectName)\$(Configuration)</Artifacts>
-
-    <OutputPath>$(Artifacts)\bin</OutputPath>
-    <BaseOutputPath>$(Artifacts)\obj</BaseOutputPath>
-    <PackageOutputPath>$(SourceDir)nuget</PackageOutputPath>
-    <!-- <DocumentationFile>$(ArtifactsDir)\$(MSBuildProjectName)\doc.xml</DocumentationFile> -->
-    <BaseIntermediateOutputPath>$(BaseOutputPath)</BaseIntermediateOutputPath>
+    <ArtifactsPath>$([System.IO.Path]::Combine(
+      $(MSBuildThisFileDirectory),
+      "artifacts",
+      $([MSBuild]::MakeRelative($(MSBuildThisFileDirectory),$(MSBuildProjectDirectory)).Replace("$(MSBuildProjectName)", '').TrimEnd('/'))
+    ))</ArtifactsPath>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IsPackable>false</IsPackable>
+    <DisableGitVersionTask Condition="'$(IsPackable)' == 'false'">false</DisableGitVersionTask>
   </PropertyGroup>
 
+  <!-- Repository -->
   <PropertyGroup>
-    <Authors>Panos Athanasiou</Authors>
-    <Copyright>Copyright (c) 2022 Panos Athanasiou</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/panoukos41/NoSQLite</PackageProjectUrl>
-    <PackageIconUrl></PackageIconUrl>
-    <DefaultPackageDescription>A thin wrapper above sqlite to use it as a nosql database.</DefaultPackageDescription>
-    <PackageDescription>$(DefaultPackageDescription)</PackageDescription>
-    <Owners>panoukos41</Owners>
-    <PackageTags>sqlite</PackageTags>
-    <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
-    <PackageReleaseNotes>$(RepositoryUrl)/releases</PackageReleaseNotes>
+    <Authors>Panagiotis Athanasiou</Authors>
+    <Copyright>Copyright (c) $([System.DateTimeOffset]::UtcNow.ToString("yyyy")) $(Authors)</Copyright>
+    <RepositoryUrl>https://github.com/panoukos41/NoSQLite</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <RepositoryLicense>MIT</RepositoryLicense>
+    <RepositoryDescription>A thin wrapper above sqlite to use it as a nosql database.</RepositoryDescription>
+    <RepositoryTags>sqlite</RepositoryTags>
+  </PropertyGroup>
+
+  <!-- Package -->
+  <PropertyGroup>
+    <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
+    <PackageLicenseExpression>$(RepositoryLicense)</PackageLicenseExpression>
+    <PackageDescription>$(RepositoryDescription)</PackageDescription>
+    <PackageTags>$(RepositoryTags)</PackageTags>
+    <PackageReleaseNotes>$(RepositoryUrl)/releases</PackageReleaseNotes>
+    <!--<PackageIcon>Icon.png</PackageIcon>-->
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
-     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild> 
-    <!-- Publish the repository URL in the built .nupkg (in the NuSpec <Repository> element) -->
-     <PublishRepositoryUrl>true</PublishRepositoryUrl>  
-    <!-- Embed source files that are not tracked by the source control manager in the PDB -->
-    <!-- <EmbedUntrackedSources>true</EmbedUntrackedSources> -->
-    <!-- Include PDB in the built .nupkg -->
-     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder> 
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Include="$(SourceDir)\README.md" Pack="true" PackagePath="\" Condition="$(MSBuildProjectDirectory.Contains('src'))" />
-    <!-- <SourceRoot Include="$(MSBuildThisFileDirectory)/" /> -->
+  <!-- Package -->
+  <ItemGroup Condition="'$(OutputType)' == 'Library' and $(IsPackable)">
+    <None Include="$(MSBuildThisFileDirectory)\README.md" Pack="True" PackagePath="\" />
+    <!--<None Include="$(MSBuildThisFileDirectory)\Icon.png" Pack="True" PackagePath="\" />-->
   </ItemGroup>
 
-  <ItemGroup>
-      <!-- Use versions like this since -->
-     <PackageReference Include="Nerdbank.GitVersioning" Version="3.6.133" PrivateAssets="All" /> 
-     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" /> 
-  </ItemGroup>
 </Project>

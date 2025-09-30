@@ -1,0 +1,8 @@
+workflow: GitHubFlow/v1
+branches:
+  main:
+    label: beta
+    increment: Patch
+  feature:
+    label: alpha
+    increment: Minor
