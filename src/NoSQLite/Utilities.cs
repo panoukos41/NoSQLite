@@ -1,5 +1,4 @@
-﻿using SQLitePCL;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace NoSQLite;
 
@@ -25,7 +24,6 @@ internal static class Extensions
             throw new NoSQLiteException($"{message.ToString()}. SQLite info, code: {result}, message: {sqlite3_errmsg(db).utf8_to_string()}");
         }
     }
-
 }
 
 [InterpolatedStringHandler]
@@ -34,22 +32,20 @@ internal readonly ref struct SQLiteCodeInterpolation
     private readonly DefaultInterpolatedStringHandler _innerHandler;
 
     /// <summary>
-    /// Inidicates that the code is invalid and an exception
-    /// should be throwen with the message that has been created.
+    /// Indicates that the result code is invalid and an exception
+    /// should be thrown with the message that has been created.
     /// </summary>
     public bool ShouldThrow { get; }
 
     public SQLiteCodeInterpolation(
         int literalLength,
         int formattedCount,
-        int code,
+        int result,
         out bool shouldAppend)
     {
         // Here we determine which sqlite codes are OK.
-        // This is used in conjuction with the <see cref="NoSQLiteException"/>.
-        if (code == SQLITE_DONE ||
-            code == SQLITE_OK ||
-            code == SQLITE_ROW)
+        // This is used in conjunction with the "NoSQLiteException".
+        if (result is SQLITE_DONE or SQLITE_OK or SQLITE_ROW)
         {
             shouldAppend = false;
             ShouldThrow = false;
@@ -69,7 +65,6 @@ internal readonly ref struct SQLiteCodeInterpolation
 
     public string ToStringAndClear() => _innerHandler.ToStringAndClear();
 }
-
 
 [InterpolatedStringHandler]
 internal readonly ref struct ConditionInterpolation

@@ -1,8 +1,4 @@
-﻿using SQLitePCL;
-
-namespace NoSQLite;
-
-using static SQLitePCL.raw;
+﻿namespace NoSQLite;
 
 internal ref struct SQLiteTransaction
 {

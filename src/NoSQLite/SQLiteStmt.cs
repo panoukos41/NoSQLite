@@ -1,9 +1,6 @@
-﻿using SQLitePCL;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace NoSQLite;
-
-using static SQLitePCL.raw;
 
 internal sealed class SQLiteStmt : IDisposable
 {
@@ -24,7 +21,7 @@ internal sealed class SQLiteStmt : IDisposable
     #region Bind
 
     /// <summary>
-    /// Bind text to a paramter.
+    /// Bind text to a parameter.
     /// </summary>
     /// <remarks>Index starts from 1.</remarks>
     /// <param name="index">The parameter index to bind to, starting from 1.</param>
@@ -32,7 +29,7 @@ internal sealed class SQLiteStmt : IDisposable
     public void BindText(int index, string value) => sqlite3_bind_text(stmt, index, value);
 
     /// <summary>
-    /// Bind text to a paramter.
+    /// Bind text to a parameter.
     /// </summary>
     /// <remarks>Index starts from 1.</remarks>
     /// <param name="index">The parameter index to bind to, starting from 1.</param>
@@ -68,7 +65,7 @@ internal sealed class SQLiteStmt : IDisposable
     public string ColumnText(int index) => sqlite3_column_text(stmt, index).utf8_to_string();
 
     /// <summary>
-    /// Get the value of a text/blobl column as a series of <see cref="byte"/>.
+    /// Get the value of a text/blob column as a series of <see cref="byte"/>.
     /// </summary>
     /// <remarks>Index starts from 0.</remarks>
     /// <param name="index">The column to read the value from, starting from 0.</param>
@@ -76,19 +73,56 @@ internal sealed class SQLiteStmt : IDisposable
     public ReadOnlySpan<byte> ColumnBlob(int index) => sqlite3_column_blob(stmt, index);
 
     /// <summary>
-    /// Get the value of a text column deserialized to <typeparamref name="T"/>.
+    /// Get the value of a text/blob column and deserialize it to the specified type <typeparamref name="T"/>.
     /// </summary>
-    /// <remarks>Index starts from 0.</remarks>
-    /// <typeparam name="T">The type to deserialize from.</typeparam>
+    /// <typeparam name="T">The type to deserialize the column value to.</typeparam>
     /// <param name="index">The column to read the value from, starting from 0.</param>
-    /// <param name="jsonOptions">The serializer options to use.</param>
-    /// <returns>An instance of <typeparamref name="T"/> or null.</returns>
-    /// <exception cref="JsonException"></exception>
-    /// <exception cref="NotSupportedException"></exception>
+    /// <param name="jsonOptions">The serializer options to use, or <c>null</c> for default options.</param>
+    /// <returns>
+    /// The column value deserialized as <typeparamref name="T"/>, or <c>null</c> if the value is <c>null</c>.
+    /// </returns>
+    /// <exception cref="JsonException">Thrown if the JSON is invalid.</exception>
+    /// <exception cref="NotSupportedException">Thrown if the type is not supported.</exception>
     public T? ColumnDeserialize<T>(int index, JsonSerializerOptions? jsonOptions = null)
     {
         var bytes = ColumnBlob(index);
         var value = JsonSerializer.Deserialize<T>(bytes, jsonOptions);
+        return value;
+    }
+
+    /// <summary>
+    /// Get the value of a text/blob column as a <see cref="JsonDocument"/>.
+    /// </summary>
+    /// <remarks>Index starts from 0.</remarks>
+    /// <param name="index">The column to read the value from, starting from 0.</param>
+    /// <param name="jsonOptions">The serializer options to use, or <c>null</c> for default options.</param>
+    /// <returns>
+    /// The column value deserialized as a <see cref="JsonDocument"/>, or <c>null</c> if the value is <c>null</c>.
+    /// </returns>
+    /// <exception cref="JsonException">Thrown if the JSON is invalid.</exception>
+    /// <exception cref="NotSupportedException">Thrown if the type is not supported.</exception>
+    public JsonDocument? ColumnDeserializeDocument(int index, JsonSerializerOptions? jsonOptions = null)
+    {
+        var bytes = ColumnBlob(index);
+        var value = JsonSerializer.Deserialize<JsonDocument>(bytes, jsonOptions);
+        return value;
+    }
+
+    /// <summary>
+    /// Get the value of a text/blob column as a <see cref="JsonElement"/>.
+    /// </summary>
+    /// <remarks>Index starts from 0.</remarks>
+    /// <param name="index">The column to read the value from, starting from 0.</param>
+    /// <param name="jsonOptions">The serializer options to use, or <c>null</c> for default options.</param>
+    /// <returns>
+    /// The column value deserialized as a <see cref="JsonElement"/>, or <c>null</c> if the value is <c>null</c>.
+    /// </returns>
+    /// <exception cref="JsonException">Thrown if the JSON is invalid.</exception>
+    /// <exception cref="NotSupportedException">Thrown if the type is not supported.</exception>
+    public JsonElement? ColumnDeserializeElement(int index, JsonSerializerOptions? jsonOptions = null)
+    {
+        var bytes = ColumnBlob(index);
+        var value = JsonSerializer.Deserialize<JsonElement>(bytes, jsonOptions);
         return value;
     }
 
@@ -109,13 +143,13 @@ internal sealed class SQLiteStmt : IDisposable
     public int Reset() => sqlite3_reset(stmt);
 
     /// <summary>
-    /// Get the error message the database has currently emmited.
+    /// Get the error message the database has currently emitted.
     /// </summary>
     /// <returns>The error message from the database.</returns>
     public string Error() => sqlite3_errmsg(db).utf8_to_string();
 
     /// <summary>
-    /// Finilize this statement.
+    /// Finalize this statement.
     /// </summary>
     public void Dispose()
     {

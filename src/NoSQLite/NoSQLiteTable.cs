@@ -1,5 +1,4 @@
-﻿using SQLitePCL;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace NoSQLite;
 
@@ -25,7 +24,6 @@ public sealed class NoSQLiteTable : IDisposable
         db = connection.db;
 
         connection.CreateTable(table);
-        connection.tables.Add(table, this);
 
         #region Lazy statment initialization
 
@@ -92,6 +90,7 @@ public sealed class NoSQLiteTable : IDisposable
             disposables.Add(stmt);
             return stmt;
         });
+
         #endregion
     }
 
@@ -107,7 +106,7 @@ public sealed class NoSQLiteTable : IDisposable
     public string Table { get; }
 
     /// <summary>
-    /// Gets or Sets the JSON serializer options used to serialzie/deserialize the documents.
+    /// Gets or Sets the JSON serializer options used to serialize/deserialize the documents.
     /// </summary>
     public JsonSerializerOptions? JsonOptions { get; set; }
 
@@ -120,12 +119,16 @@ public sealed class NoSQLiteTable : IDisposable
     /// Drops the table and then Creates it again. This will delete all indexes views etc.
     /// </summary>
     /// <remarks>See <see href="https://sqlite.org/lang_droptable.html"/> for more info.</remarks>
-    public void DropAndCreate() => Connection.DropAndCreate(Table);
+    public void DropAndCreate() => Connection.DropAndCreateTable(Table);
 
     #region Basic
 
     private readonly Lazy<SQLiteStmt> countStmt;
 
+    /// <summary>
+    /// Gets the number of rows in the table.
+    /// </summary>
+    /// <returns>The number of rows in the table as an <see cref="int"/>.</returns>
     public int Count()
     {
         var stmt = countStmt.Value;
@@ -139,6 +142,10 @@ public sealed class NoSQLiteTable : IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets the number of rows in the table as a <see cref="long"/>.
+    /// </summary>
+    /// <returns>The number of rows in the table as a <see cref="long"/>.</returns>
     public long LongCount()
     {
         var stmt = countStmt.Value;
@@ -155,7 +162,7 @@ public sealed class NoSQLiteTable : IDisposable
     private readonly Lazy<SQLiteStmt> existsStmt;
 
     /// <summary>
-    /// Check wheter a document exists or not.
+    /// Check whether a document exists or not.
     /// </summary>
     /// <param name="id">The id to search for.</param>
     /// <returns>True when the id exists otherwise false.</returns>
@@ -180,7 +187,7 @@ public sealed class NoSQLiteTable : IDisposable
         var stmt = allStmt.Value;
         lock (allStmt)
         {
-            start:
+        start:
             var result = stmt.Step();
 
             if (result is not SQLITE_ROW)
@@ -200,7 +207,7 @@ public sealed class NoSQLiteTable : IDisposable
         var stmt = allStmt.Value;
         lock (allStmt)
         {
-            start:
+        start:
             var result = stmt.Step();
 
             if (result is not SQLITE_ROW)
@@ -426,7 +433,7 @@ public sealed class NoSQLiteTable : IDisposable
     /// Deletes the specified ids from the database.
     /// </summary>
     /// <param name="ids">The ids to delete.</param>
-    public void RemoveMany(IEnumerable<string> ids)
+    public void RemoveMany(params IEnumerable<string> ids)
     {
         using var transaction = new SQLiteTransaction(db);
         foreach (var id in ids)
@@ -455,7 +462,7 @@ public sealed class NoSQLiteTable : IDisposable
         stmt.Step();
 
         var value = stmt.ColumnInt(0);
-        return value != 0;
+        return value is not 0;
     }
 
     /// <summary>
@@ -472,10 +479,10 @@ public sealed class NoSQLiteTable : IDisposable
     {
         string sql = $"""
             CREATE INDEX "{Table}_{indexName}"
-            ON "{Table}"(json_extract("json", '$.{parameter}'));
+            ON "{Table}" (json_extract(json, '$.{parameter}'));
             """;
 
-        return sqlite3_exec(db, sql) == SQLITE_OK;
+        return sqlite3_exec(db, sql) is SQLITE_OK;
     }
 
     /// <summary>
@@ -501,7 +508,7 @@ public sealed class NoSQLiteTable : IDisposable
             DROP INDEX "{Table}_{indexName}"
             """;
 
-        return sqlite3_exec(db, sql) == SQLITE_OK;
+        return sqlite3_exec(db, sql) is SQLITE_OK;
     }
 
     #endregion
@@ -521,10 +528,13 @@ public sealed class NoSQLiteTable : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        Connection.tables.Remove(Table);
+        Connection.tables.Remove(Table, out _);
         if (disposables.Count <= 0) return;
 
-        foreach (var d in disposables) d.Dispose();
+        var toDispose = new IDisposable[disposables.Count];
+        disposables.CopyTo(toDispose);
         disposables.Clear();
+
+        foreach (var d in toDispose) d.Dispose();
     }
 }
