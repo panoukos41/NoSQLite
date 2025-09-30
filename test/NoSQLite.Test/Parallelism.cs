@@ -4,8 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NoSQLite.Test.Data;
+namespace NoSQLite.Test;
 
-public sealed record Animal
+internal class Parallelism
 {
 }

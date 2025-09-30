@@ -2,7 +2,7 @@
 
 namespace NoSQLite.Test.Data;
 
-public sealed record Person
+public sealed record TestPerson
 {
     public string Email { get; set; }
 
@@ -15,7 +15,7 @@ public sealed record Person
     public DateOnly Birthdate { get; set; }
 }
 
-public sealed class PersonFaker : Faker<Person>
+public sealed class PersonFaker : Faker<TestPerson>
 {
     public PersonFaker()
     {

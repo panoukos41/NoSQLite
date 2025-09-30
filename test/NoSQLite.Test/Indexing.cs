@@ -2,59 +2,55 @@
 
 public sealed class Indexing : TestBase<Indexing>
 {
-    public Indexing(TestFixture<Indexing> fixture) : base(fixture)
-    {
-    }
-
-    [Fact]
-    public void Exists()
+    [Test]
+    public async Task Exists()
     {
         var table = GetTable();
 
         var create = table.CreateIndex("test", "email");
-        create.Should().BeTrue();
+        await That(create).IsTrue();
 
         var exists = table.IndexExists("test");
         var notExists = table.IndexExists("test_1");
 
-        exists.Should().BeTrue();
-        notExists.Should().BeFalse();
+        await That(exists).IsTrue();
+        await That(notExists).IsFalse();
     }
 
-    [Fact]
-    public void Create()
+    [Test]
+    public async Task Create()
     {
         var table = GetTable();
 
         var notExists = table.CreateIndex("test", "email");
         var exists = table.CreateIndex("test", "email");
 
-        notExists.Should().BeTrue();
-        exists.Should().BeFalse();
+        await That(exists).IsTrue();
+        await That(notExists).IsFalse();
     }
 
-    [Fact]
-    public void Recreate()
+    [Test]
+    public async Task Recreate()
     {
         var table = GetTable();
 
         table.RecreateIndex("test", "email");
 
-        table.IndexExists("test").Should().BeTrue();
+        await That(table.IndexExists("test")).IsTrue();
     }
 
-    [Fact]
-    public void Delete()
+    [Test]
+    public async Task Delete()
     {
         var table = GetTable();
 
         var create = table.CreateIndex("test", "email");
-        create.Should().BeTrue();
+        await That(create).IsTrue();
 
         var exists = table.DeleteIndex("test");
         var notExists = table.DeleteIndex("test");
 
-        exists.Should().BeTrue();
-        notExists.Should().BeFalse();
+        await That(exists).IsTrue();
+        await That(notExists).IsFalse();
     }
 }

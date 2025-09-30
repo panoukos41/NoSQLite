@@ -1,4 +1,4 @@
-global using FluentAssertions;
-global using NoSQLite.Test.Abstractions;
 global using NoSQLite.Test.Data;
-global using Xunit;
+global using Bogus;
+global using TUnit;
+global using static TUnit.Assertions.Assert;
