@@ -12,6 +12,11 @@ public sealed class Operations : TestBase<Operations>
         Connection.CreateTable(table);
 
         await That(Connection.TableExists(table)).IsTrue();
+
+        var t = Connection.GetTable(table);
+
+        t.CreateIndex("name", "name");
+        t.Insert(new { id = "1", name = 10 });
     }
 
     [Test]
@@ -42,7 +47,7 @@ public sealed class Operations : TestBase<Operations>
         await That(Connection.TableExists(table)).IsTrue();
 
         var dbTable = Connection.GetTable(table);
-        dbTable.Insert("0", new PersonFaker().Generate());
+        dbTable.Insert(new PersonFaker().Generate());
         await That(dbTable.Count()).IsEqualTo(1);
         dbTable.Dispose();
         dbTable = null;
@@ -68,7 +73,7 @@ public sealed class Operations : TestBase<Operations>
         await That(Directory.GetFiles(dir).Length).IsEqualTo(1);
 
         var table = connection.GetTable();
-        table.Insert("0", new PersonFaker().Generate());
+        table.Insert(new PersonFaker().Generate());
 
         await That(Directory.GetFiles(dir).Length).IsEqualTo(3);
 
@@ -94,7 +99,7 @@ public sealed class Operations : TestBase<Operations>
         await That(Directory.GetFiles(dir).Length).IsEqualTo(1);
 
         var table = connection.GetTable();
-        table.Insert("0", new PersonFaker().Generate());
+        table.Insert(new PersonFaker().Generate());
 
         await That(Directory.GetFiles(dir).Length).IsEqualTo(3);
 

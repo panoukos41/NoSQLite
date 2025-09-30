@@ -123,9 +123,7 @@ public sealed class NoSQLiteConnection : IDisposable
     {
         var result = sqlite3_exec(db, $"""
             CREATE TABLE IF NOT EXISTS "{table}" (
-                "id"        TEXT NOT NULL UNIQUE,
-                "json"      TEXT NOT NULL,
-                PRIMARY KEY("id")
+                "json" JSONB NOT NULL
             );
             """);
 

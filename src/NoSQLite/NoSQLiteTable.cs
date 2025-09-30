@@ -73,7 +73,7 @@ public sealed class NoSQLiteTable : IDisposable
         {
             var stmt = new SQLiteStmt(db, $"""
                 REPLACE INTO "{Table}"
-                VALUES (?, json(?));
+                VALUES (json(?));
                 """);
 
             disposables.Add(stmt);
@@ -369,41 +369,40 @@ public sealed class NoSQLiteTable : IDisposable
 
     private readonly Lazy<SQLiteStmt> insertStmt;
 
-    public void Insert<T>(string id, T obj)
+    public void Insert<T>(T obj)
     {
-        InsertBytes(id, JsonSerializer.SerializeToUtf8Bytes(obj, JsonOptions));
+        InsertBytes(JsonSerializer.SerializeToUtf8Bytes(obj, JsonOptions));
     }
 
-    public void InsertMany<T>(IDictionary<string, T> keyValuePairs)
+    public void InsertMany<T>(IEnumerable<T> keyValuePairs)
     {
         using var transaction = new SQLiteTransaction(db);
-        foreach (var (id, obj) in keyValuePairs)
+        foreach (var obj in keyValuePairs)
         {
-            Insert(id, obj);
+            Insert(obj);
         }
     }
 
-    public void InsertBytes(string id, byte[] obj)
+    public void InsertBytes(byte[] obj)
     {
         var stmt = insertStmt.Value;
 
         lock (insertStmt)
         {
-            stmt.BindText(1, id);
-            stmt.BindText(2, obj);
+            stmt.BindText(1, obj);
             var result = stmt.Step();
 
-            db.CheckResult(result, $"Could not Insert ({id})");
+            db.CheckResult(result, $"Could not Insert");
             stmt.Reset();
         }
     }
 
-    public void InsertBytesMany(IDictionary<string, byte[]> keyValuePairs)
+    public void InsertBytesMany(IEnumerable<byte[]> keyValuePairs)
     {
         using var transaction = new SQLiteTransaction(db);
-        foreach (var (id, obj) in keyValuePairs)
+        foreach (var obj in keyValuePairs)
         {
-            InsertBytes(id, obj);
+            InsertBytes(obj);
         }
     }
 
