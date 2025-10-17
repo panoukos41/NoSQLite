@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="NoSQLite.Test"/>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="SQLitePCLRaw.core" />
   </ItemGroup>
 

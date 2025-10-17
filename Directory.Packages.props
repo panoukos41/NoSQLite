@@ -6,21 +6,21 @@
   <!---->
   <!-- Packagges -->
   <ItemGroup>
-    <PackageVersion Include="BenchmarkDotNet" Version="0.15.0" />
-    <PackageVersion Include="SQLitePCLRaw.core" Version="2.1.11" />
-    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.4" />
+    <PackageVersion Include="SQLitePCLRaw.core" Version="3.0.2" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.2" />
   </ItemGroup>
   <!---->
   <!-- Testing -->
   <ItemGroup>
-    <PackageVersion Include="Bogus" Version="35.6.3" />
-    <PackageVersion Include="TUnit" Version="0.25.6" />
+    <PackageVersion Include="Bogus" Version="35.6.4" />
+    <PackageVersion Include="TUnit" Version="0.73.14" />
   </ItemGroup>
   <!---->
   <!-- Versioning & SourceLink -->
   <ItemGroup>
     <GlobalPackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
-    <GlobalPackageReference Include="GitVersion.MSBuild" Version="6.1.0" />
+    <GlobalPackageReference Include="GitVersion.MSBuild" Version="6.4.0" />
   </ItemGroup>
   <!---->
 </Project>

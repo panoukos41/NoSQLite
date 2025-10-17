@@ -1,12 +1,8 @@
-﻿using System.Text.Json;
+﻿using System.Linq.Expressions;
+using System.Text.Json;
 
 namespace NoSQLite;
 
-using static SQLitePCL.raw;
-
-/// <summary>
-/// todo: Summary
-/// </summary>
 [Preserve(AllMembers = true)]
 public sealed class NoSQLiteTable : IDisposable
 {
@@ -15,514 +11,206 @@ public sealed class NoSQLiteTable : IDisposable
 
     internal NoSQLiteTable(string table, NoSQLiteConnection connection)
     {
-        ArgumentNullException.ThrowIfNull(connection, nameof(connection));
-        ArgumentNullException.ThrowIfNull(table, nameof(table));
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentException.ThrowIfNullOrEmpty(table);
 
         Table = table;
         Connection = connection;
-        JsonOptions = connection.JsonOptions;
         db = connection.db;
 
         connection.CreateTable(table);
-
-        #region Lazy statment initialization
-
-        countStmt = new(() =>
-        {
-            var stmt = new SQLiteStmt(db, $"""
-                SELECT count(*) FROM "{Table}";
-                """);
-
-            disposables.Add(stmt);
-            return stmt;
-        });
-
-        existsStmt = new(() =>
-        {
-            var stmt = new SQLiteStmt(db, $"""
-                SELECT count(*) FROM "{Table}"
-                WHERE id is ?;
-                """);
-
-            disposables.Add(stmt);
-            return stmt;
-        });
-
-        allStmt = new(() =>
-        {
-            var stmt = new SQLiteStmt(db, $"""
-                SELECT json FROM "{Table}";
-                """);
-            disposables.Add(stmt);
-            return stmt;
-        });
-
-        findStmt = new(() =>
-        {
-            var stmt = new SQLiteStmt(db, $"""
-                SELECT json
-                FROM "{Table}"
-                WHERE id is ?;
-                """);
-
-            disposables.Add(stmt);
-            return stmt;
-        });
-
-        insertStmt = new(() =>
-        {
-            var stmt = new SQLiteStmt(db, $"""
-                REPLACE INTO "{Table}"
-                VALUES (json(?));
-                """);
-
-            disposables.Add(stmt);
-            return stmt;
-        });
-
-        removeStmt = new(() =>
-        {
-            var stmt = new SQLiteStmt(db, $"""
-                DELETE FROM "{Table}"
-                WHERE id is ?;
-                """);
-
-            disposables.Add(stmt);
-            return stmt;
-        });
-
-        #endregion
     }
 
-    /// <summary>
-    /// The connection that created and manages this table.
-    /// </summary>
-    /// <remarks>If the connection is disposed this will also be disposed.</remarks>
     public NoSQLiteConnection Connection { get; }
 
-    /// <summary>
-    /// The name of the table this connection will use.
-    /// </summary>
     public string Table { get; }
 
-    /// <summary>
-    /// Gets or Sets the JSON serializer options used to serialize/deserialize the documents.
-    /// </summary>
-    public JsonSerializerOptions? JsonOptions { get; set; }
+    public JsonSerializerOptions? JsonOptions => Connection.JsonOptions;
 
-    /// <summary>
-    /// Deletes all rows from a table.
-    /// </summary>
-    public void Clear() => Connection.Clear(Table);
+    private SQLiteStmt CountStmt => field ??= new(db, disposables: disposables, sql: $"""
+        SELECT count(*) FROM "{Table}"
+        """);
 
-    /// <summary>
-    /// Drops the table and then Creates it again. This will delete all indexes views etc.
-    /// </summary>
-    /// <remarks>See <see href="https://sqlite.org/lang_droptable.html"/> for more info.</remarks>
-    public void DropAndCreate() => Connection.DropAndCreateTable(Table);
-
-    #region Basic
-
-    private readonly Lazy<SQLiteStmt> countStmt;
-
-    /// <summary>
-    /// Gets the number of rows in the table.
-    /// </summary>
-    /// <returns>The number of rows in the table as an <see cref="int"/>.</returns>
     public int Count()
     {
-        var stmt = countStmt.Value;
-        lock (countStmt)
-        {
-            stmt.Step();
-
-            var count = stmt.ColumnInt(0);
-            stmt.Reset();
-            return count;
-        }
+        return CountStmt.Execute(null, static r => r.Int(0));
     }
 
-    /// <summary>
-    /// Gets the number of rows in the table as a <see cref="long"/>.
-    /// </summary>
-    /// <returns>The number of rows in the table as a <see cref="long"/>.</returns>
+    private SQLiteStmt LongCountStmt => field ??= new(db, disposables: disposables, sql: $"""
+        SELECT count(*) FROM "{Table}"
+        """);
+
     public long LongCount()
     {
-        var stmt = countStmt.Value;
-        lock (countStmt)
-        {
-            stmt.Step();
-
-            var count = stmt.ColumnLong(0);
-            stmt.Reset();
-            return count;
-        }
+        var table = Table;
+        return LongCountStmt.Execute(null, static r => r.Long(0));
     }
 
-    private readonly Lazy<SQLiteStmt> existsStmt;
+    private SQLiteStmt AllStmt => field ??= new(db, disposables: disposables, sql: $"""
+        SELECT "documents" FROM "{Table}"
+        """);
 
-    /// <summary>
-    /// Check whether a document exists or not.
-    /// </summary>
-    /// <param name="id">The id to search for.</param>
-    /// <returns>True when the id exists otherwise false.</returns>
-    public bool Exists(string id)
+    public T[] All<T>()
     {
-        var stmt = existsStmt.Value;
-        lock (existsStmt)
-        {
-            stmt.BindText(1, id);
-            stmt.Step();
-
-            var value = stmt.ColumnInt(0);
-            stmt.Reset();
-            return value != 0;
-        }
+        var jsonOptions = JsonOptions;
+        return AllStmt.ExecuteMany(null, r => r.Deserialize<T>(0, jsonOptions)!);
     }
 
-    private readonly Lazy<SQLiteStmt> allStmt;
+    private SQLiteStmt ClearStmt => field ??= new(db, disposables: disposables, sql: $"""
+        DELETE FROM "{Table}"
+        """);
 
-    public IEnumerable<T> All<T>()
+    public void Clear()
     {
-        var stmt = allStmt.Value;
-        lock (allStmt)
-        {
-        start:
-            var result = stmt.Step();
+        ClearStmt.Execute(null);
+    }
 
-            if (result is not SQLITE_ROW)
+    private SQLiteStmt ExistsStmt => field ??= new(db, disposables: disposables, sql: $"""
+        SELECT count(*) FROM "{Table}"
+        WHERE "documents"->('$.' || ?) = ?;
+        """);
+
+    public bool Exists<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
+    {
+        var propertyPath = selector.GetPropertyPath();
+        var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
+
+        return ExistsStmt.Execute(
+            b =>
             {
-                stmt.Reset();
-                yield break;
-            }
-
-            var value = stmt.ColumnDeserialize<T>(0, JsonOptions);
-            yield return value!;
-            goto start;
-        }
+                b.Text(1, propertyPath);
+                b.Text(2, jsonKey);
+            },
+            static b => b.Int(0) is not 0
+        );
     }
 
-    public IEnumerable<byte[]> AllBytes()
-    {
-        var stmt = allStmt.Value;
-        lock (allStmt)
-        {
-        start:
-            var result = stmt.Step();
+    private SQLiteStmt FindStmt => field ??= new(db, disposables: disposables, sql: $"""
+        SELECT "documents"
+        FROM "{Table}"
+        WHERE "documents"->('$.' || ?) = ?
+        """);
 
-            if (result is not SQLITE_ROW)
+    public T Find<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
+    {
+        var propertyPath = selector.GetPropertyPath();
+        var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
+
+        return FindStmt.Execute(
+            b =>
             {
-                stmt.Reset();
-                yield break;
-            }
-
-            var bytes = stmt.ColumnBlob(0).ToArray();
-            yield return bytes;
-            goto start;
-        }
+                b.Text(1, propertyPath);
+                b.Text(2, jsonKey);
+            },
+            r => r.Deserialize<T>(0, JsonOptions)!
+        );
     }
 
-    #endregion
+    private SQLiteStmt FindPropertyStmt => field ??= new(db, disposables: disposables, sql: $"""
+        SELECT "documents"->('$.' || ?)
+        FROM "{Table}"
+        WHERE "documents"->('$.' || ?) = ?
+        """);
 
-    #region Find
-
-    private readonly Lazy<SQLiteStmt> findStmt;
-
-    /// <summary>
-    /// Get an object for the provided id or null.
-    /// </summary>
-    /// <typeparam name="T">The type the object will deserialize to.</typeparam>
-    /// <param name="id">The id to search for.</param>
-    /// <returns>An instance of <typeparamref name="T"/> or null.</returns>
-    public T? Find<T>(string id)
+    public TProperty FindProperty<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty>> propertySelector, TKey key)
     {
-        var stmt = findStmt.Value;
-        lock (findStmt)
-        {
-            stmt.BindText(1, id);
-            var result = stmt.Step();
+        var keyPropertyPath = keySelector.GetPropertyPath();
+        var propertyPath = propertySelector.GetPropertyPath();
+        var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
 
-            if (result is not SQLITE_ROW)
+        return FindPropertyStmt.Execute(
+            b =>
             {
-                stmt.Reset();
-                return default;
-            }
-
-            var value = stmt.ColumnDeserialize<T>(0, JsonOptions);
-            stmt.Reset();
-            return value;
-        }
+                b.Text(1, propertyPath);
+                b.Text(2, keyPropertyPath);
+                b.Text(3, jsonKey);
+            },
+            r => r.Deserialize<TProperty>(0, JsonOptions)!
+        );
     }
 
-    /// <summary>
-    /// Get an object for each one of the provided ids.
-    /// </summary>
-    /// <typeparam name="T">The type the objects will deserialize to.</typeparam>
-    /// <param name="ids">The ids to search for.</param>
-    /// <param name="throwIfNotFound">True to ignore missing ids</param>
-    /// <returns>A list of <typeparamref name="T"/> objects.</returns>
-    /// <exception cref="KeyNotFoundException">When <paramref name="throwIfNotFound"/> is true and a key is not found.</exception>
-    public IEnumerable<T> FindMany<T>(IEnumerable<string> ids, bool throwIfNotFound = true)
-    {
-        foreach (var id in ids)
-        {
-            var doc = Find<T>(id);
-
-            if (doc is null)
-            {
-                Throw.KeyNotFound(throwIfNotFound, $"Could not locate the Id '{id}'");
-                continue;
-            }
-            yield return doc;
-        }
-    }
-
-    /// <summary>
-    /// Get Id - <typeparamref name="T"/> pairs.
-    /// If an object doesn't exist it will have a null value.
-    /// </summary>
-    /// <typeparam name="T">The type the objects will deserialize to.</typeparam>
-    /// <param name="ids">The ids to search for.</param>
-    /// <returns>An enumerable of Id - <typeparamref name="T"/> object pairs.</returns>
-    /// <remarks>Duplicate keys are ignored.</remarks>
-    public IDictionary<string, T?> FindPairs<T>(IEnumerable<string> ids)
-    {
-        var dictionary = new Dictionary<string, T?>();
-        foreach (var id in ids)
-        {
-            if (dictionary.ContainsKey(id)) continue;
-
-            dictionary.Add(id, Find<T>(id));
-        }
-        return dictionary;
-    }
-
-    /// <summary>
-    /// Get a byte array for the provided id or null.
-    /// </summary>
-    /// <param name="id">The id to search for.</param>
-    /// <returns>A byte array or null.</returns>
-    public byte[]? FindBytes(string id)
-    {
-        var stmt = findStmt.Value;
-        lock (findStmt)
-        {
-            stmt.BindText(1, id);
-            var result = stmt.Step();
-
-            if (result is not SQLITE_ROW)
-            {
-                stmt.Reset();
-                return default;
-            }
-
-            var bytes = stmt.ColumnBlob(0).ToArray();
-            stmt.Reset();
-            return bytes;
-        }
-    }
-
-    /// <summary>
-    /// Get a byte array for each one of the provided ids.
-    /// </summary>
-    /// <param name="ids">The ids to search for.</param>
-    /// <param name="throwIfNotFound">True to ignore missing ids</param>
-    /// <returns>A list of byte arrays.</returns>
-    /// <exception cref="KeyNotFoundException">When <paramref name="throwIfNotFound"/> is true and a key is not found.</exception>
-    public IEnumerable<byte[]> FindBytesMany(IEnumerable<string> ids, bool throwIfNotFound = true)
-    {
-        foreach (var id in ids)
-        {
-            var bytes = FindBytes(id);
-
-            if (bytes is null)
-            {
-                Throw.KeyNotFound(throwIfNotFound, $"Could not locate the Id '{id}'");
-                continue;
-            }
-            yield return bytes;
-        }
-    }
-
-    /// <summary>
-    /// Get Id - byte array pairs.
-    /// If an object doesn't exist it will have a null value
-    /// for the corresponding Id in the dictionary.
-    /// </summary>
-    /// <param name="ids">The ids to search for.</param>
-    /// <returns>A dictionary of Id - <typeparamref name="T"/> object pairs.</returns>
-    /// <remarks>Duplicate keys are just put on the key again.</remarks>
-    public IDictionary<string, byte[]?> FindBytesPairs(IEnumerable<string> ids)
-    {
-        var pairs = new Dictionary<string, byte[]?>();
-        foreach (var id in ids)
-        {
-            var bytes = FindBytes(id);
-            pairs[id] = bytes;
-        }
-        return pairs;
-    }
-
-    #endregion
-
-    #region Insert
-
-    private readonly Lazy<SQLiteStmt> insertStmt;
+    private SQLiteStmt InsertStmt => field ??= new(db, disposables: disposables, sql: $"""
+        INSERT INTO "{Table}"("documents") VALUES (?)
+        """);
 
     public void Insert<T>(T obj)
     {
-        InsertBytes(JsonSerializer.SerializeToUtf8Bytes(obj, JsonOptions));
+        var document = JsonSerializer.SerializeToUtf8Bytes(obj, JsonOptions);
+
+        InsertStmt.Execute(b => b.Blob(1, document));
     }
 
-    public void InsertMany<T>(IEnumerable<T> keyValuePairs)
+    public void Update<T, TKey>(T document, Expression<Func<T, TKey>> selector)
     {
-        using var transaction = new SQLiteTransaction(db);
-        foreach (var obj in keyValuePairs)
+        using var stmt = new SQLiteStmt(db, $"""
+            UPDATE "{Table}"
+            SET "documents" = ?
+            WHERE "documents"->('$.' || ?) = ?;
+            """);
+
+        var propertyPath = selector.GetPropertyPath();
+        var key = selector.Compile().Invoke(document);
+        var jsonDocument = JsonSerializer.SerializeToUtf8Bytes(document, JsonOptions);
+        var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
+
+        stmt.Execute(b =>
         {
-            Insert(obj);
-        }
+            b.Blob(1, jsonDocument);
+            b.Text(2, propertyPath);
+            b.Text(3, jsonKey);
+        });
     }
 
-    public void InsertBytes(byte[] obj)
+    public void Remove<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
     {
-        var stmt = insertStmt.Value;
+        using var stmt = new SQLiteStmt(db, $"""
+            DELETE FROM "{Table}"
+            WHERE "documents"->('$.' || ?) = ?;
+            """);
 
-        lock (insertStmt)
+        var propertyPath = selector.GetPropertyPath();
+        var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
+
+        stmt.Execute(b =>
         {
-            stmt.BindText(1, obj);
-            var result = stmt.Step();
-
-            db.CheckResult(result, $"Could not Insert");
-            stmt.Reset();
-        }
+            b.Text(1, propertyPath);
+            b.Text(2, jsonKey);
+        });
     }
 
-    public void InsertBytesMany(IEnumerable<byte[]> keyValuePairs)
-    {
-        using var transaction = new SQLiteTransaction(db);
-        foreach (var obj in keyValuePairs)
-        {
-            InsertBytes(obj);
-        }
-    }
-
-    #endregion
-
-    #region Remove
-
-    private readonly Lazy<SQLiteStmt> removeStmt;
-
-    /// <summary>
-    /// Deletes the specified id from the database.
-    /// </summary>
-    /// <param name="id">The id to delete.</param>
-    public void Remove(string id)
-    {
-        var stmt = removeStmt.Value;
-
-        lock (removeStmt)
-        {
-            stmt.BindText(1, id);
-            stmt.Step();
-            stmt.Reset();
-        }
-    }
-
-    /// <summary>
-    /// Deletes the specified ids from the database.
-    /// </summary>
-    /// <param name="ids">The ids to delete.</param>
-    public void RemoveMany(params IEnumerable<string> ids)
-    {
-        using var transaction = new SQLiteTransaction(db);
-        foreach (var id in ids)
-        {
-            Remove(id);
-        }
-    }
-
-    #endregion
-
-    #region Indexing
-
-    /// <summary>
-    /// Check whether an index exists or not.
-    /// </summary>
-    /// <param name="indexName">The index to search for.</param>
-    /// <returns>True when the index exists.</returns>
     public bool IndexExists(string indexName)
     {
-        string sql = $"""
-            SELECT count(*) FROM sqlite_master
-            WHERE type='index' and name="{Table}_{indexName}";
-            """;
+        using var stmt = new SQLiteStmt(db, """
+            SELECT name FROM "sqlite_master"
+            WHERE type='index' AND name = ?;
+            """u8);
 
-        using var stmt = new SQLiteStmt(db, sql);
-        stmt.Step();
+        var index = $"{Table}_{indexName}";
 
-        var value = stmt.ColumnInt(0);
-        return value is not 0;
+        return stmt.Execute(b => b.Text(1, index), static r => r.Result is SQLITE_ROW, shouldThrow: false);
     }
 
-    /// <summary>
-    /// Create an index on a json parameter using the <b> json_extract(json, '$.param') </b> opperator.
-    /// Parameter can include nested json values eg: assets.house.location
-    /// </summary>
-    /// <param name="indexName">The name of the index. If this name exists the index won't be created.</param>
-    /// <param name="parameter">The json parameter to create the index for.</param>
-    /// <remarks>
-    /// Parameter names are case sensitive.<br/>
-    /// Index name on sqlite will always be created as <see cref="Table"/>_<paramref name="indexName"/>
-    /// </remarks>
-    public bool CreateIndex(string indexName, string parameter)
+    public void CreateIndex<T, TKey>(Expression<Func<T, TKey>> selector, string indexName)
     {
-        string sql = $"""
-            CREATE INDEX "{Table}_{indexName}"
-            ON "{Table}" (json_extract(json, '$.{parameter}'));
-            """;
+        var propertyPath = selector.GetPropertyPath();
 
-        return sqlite3_exec(db, sql) is SQLITE_OK;
+        // can't use parameter (?) here so we have to create a new statement every time.
+        using var stmt = new SQLiteStmt(db, $"""
+            CREATE INDEX IF NOT EXISTS "{Table}_{indexName}"
+            ON "{Table}" ("documents"->'$.{propertyPath}')
+            """);
+
+        stmt.Execute(null);
     }
 
-    /// <summary>
-    /// Combination of <see cref="DeleteIndex(string)"/> and <see cref="CreateIndex(string, string)"/>
-    /// </summary>
-    /// <param name="indexName">The name of the index.</param>
-    /// <param name="parameter">The json parameter to update the index for.</param>
-    /// <remarks>Index on sqlite is always <see cref="Table"/>_<paramref name="indexName"/></remarks>
-    public void RecreateIndex(string indexName, string parameter)
-    {
-        DeleteIndex(indexName);
-        CreateIndex(indexName, parameter);
-    }
-
-    /// <summary>
-    /// Delete an index if it exists.
-    /// </summary>
-    /// <param name="indexName">The name of the index.</param>
-    /// <remarks>Index on sqlite is always <see cref="Table"/>_<paramref name="indexName"/></remarks>
     public bool DeleteIndex(string indexName)
     {
-        string sql = $"""
+        using var stmt = new SQLiteStmt(db, $"""
             DROP INDEX "{Table}_{indexName}"
-            """;
+            """);
 
-        return sqlite3_exec(db, sql) is SQLITE_OK;
+        return stmt.Execute(null, static r => true);
     }
-
-    #endregion
-
-    #region Query
-
-    // todo: Implement query capabilities.
-
-    #endregion
-
-    #region View
-
-    // todo: Implement view usage.
-
-    #endregion
 
     /// <inheritdoc/>
     public void Dispose()

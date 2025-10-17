@@ -8,9 +8,9 @@ namespace NoSQLite;
 /// Represents a connection to a NoSQLite database, providing methods to manage tables and documents.
 /// </summary>
 [Preserve(AllMembers = true)]
-public sealed class NoSQLiteConnection : IDisposable
+public sealed partial class NoSQLiteConnection : IDisposable
 {
-    private readonly bool disposeDb;
+    private readonly Lazy<SQLiteStmt> tableExistsStmt;
 
     /// <summary>
     /// The collection of tables managed by this connection.
@@ -30,51 +30,25 @@ public sealed class NoSQLiteConnection : IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="NoSQLiteConnection"/> class.
     /// </summary>
-    /// <param name="databasePath">The path to the database file, or the path where the file will be created.</param>
+    /// <param name="db">The sqlite3 database.</param>
     /// <param name="jsonOptions">The options used to serialize/deserialize JSON objects, or <c>null</c> for defaults.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="databasePath"/> is <c>null</c>.</exception>
-    public NoSQLiteConnection(string databasePath, JsonSerializerOptions? jsonOptions = null, bool wal = true)
+    public NoSQLiteConnection(sqlite3 db, JsonSerializerOptions? jsonOptions = null)
     {
-        ArgumentNullException.ThrowIfNull(databasePath, nameof(databasePath));
-        disposeDb = true;
-
-        var result = sqlite3_open(databasePath, out db);
-        db.CheckResult(result, $"Could not open or create database file: {Path}");
-
-        if (wal)
-        {
-            SetJournalMode();
-        }
-
-        Version = sqlite3_libversion().utf8_to_string();
-        Name = System.IO.Path.GetFileName(databasePath);
-        Path = databasePath;
-        JsonOptions = jsonOptions;
+        this.db = db;
         tables = [];
+        Version = sqlite3_libversion().utf8_to_string();
+        JsonOptions = jsonOptions;
+
+        tableExistsStmt = new(() => new SQLiteStmt(db, """
+            SELECT name FROM "sqlite_master"
+            WHERE type='table' AND name = ?;
+            """u8));
     }
 
     /// <summary>
-    /// Sets the SQLite journal mode to Write-Ahead Logging (WAL).
+    /// Gets the JSON serializer options used to serialize/deserialize the documents.
     /// </summary>
-    public void SetJournalMode()
-    {
-        sqlite3_exec(db, "PRAGMA journal_mode=WAL;");
-    }
-
-    /// <summary>
-    /// Gets or sets the JSON serializer options used to serialize/deserialize the documents.
-    /// </summary>
-    public JsonSerializerOptions? JsonOptions { get; set; }
-
-    /// <summary>
-    /// Gets the database name.
-    /// </summary>
-    public string Name { get; }
-
-    /// <summary>
-    /// Gets the database path used by this connection.
-    /// </summary>
-    public string Path { get; }
+    public JsonSerializerOptions? JsonOptions { get; }
 
     /// <summary>
     /// Gets the SQLite library version.
@@ -84,18 +58,17 @@ public sealed class NoSQLiteConnection : IDisposable
     /// <summary>
     /// Gets all the tables that belong to this connection.
     /// </summary>
-    public IReadOnlyCollection<NoSQLiteTable> Tables => [.. tables.Values];
+    public IEnumerable<NoSQLiteTable> Tables => tables.Values;
 
     /// <summary>
     /// Gets a table with the specified name, or the default "documents" table if <paramref name="table"/> is <c>null</c>.
     /// If the table does not exist in the connection's cache, a new <see cref="NoSQLiteTable"/> is created.
     /// </summary>
-    /// <param name="table">The name of the table to create or use, or <c>null</c> to use the default "documents" table.</param>
+    /// <param name="table">The name of the table to use and create if it does not exist.</param>
     /// <returns>The <see cref="NoSQLiteTable"/> instance for the specified table.</returns>
-    public NoSQLiteTable GetTable(string? table = null)
+    public NoSQLiteTable GetTable(string table)
     {
-        const string docs = "documents";
-        return tables.GetOrAdd(table ?? docs, static (table, connection) => new(table, connection), this);
+        return tables.GetOrAdd(table, static (table, connection) => new(table, connection), this);
     }
 
     /// <summary>
@@ -105,13 +78,8 @@ public sealed class NoSQLiteConnection : IDisposable
     /// <returns><c>true</c> if the table exists; otherwise, <c>false</c>.</returns>
     public bool TableExists(string table)
     {
-        using var stmt = new SQLiteStmt(db, $"""
-            SELECT count(*) FROM "sqlite_master"
-            WHERE type='table' AND name='{table}';
-            """);
-
-        stmt.Step();
-        return stmt.ColumnInt(0) != 0;
+        var stmt = tableExistsStmt.Value;
+        return stmt.Execute(b => b.Text(1, table), static r => r.Result is SQLITE_ROW, shouldThrow: false);
     }
 
     /// <summary>
@@ -121,56 +89,25 @@ public sealed class NoSQLiteConnection : IDisposable
     /// <exception cref="Exception">Thrown if the table cannot be created.</exception>
     public void CreateTable(string table)
     {
-        var result = sqlite3_exec(db, $"""
+        using var stmt = new SQLiteStmt(db, $"""
             CREATE TABLE IF NOT EXISTS "{table}" (
-                "json" JSONB NOT NULL
+                "documents" JSON NOT NULL
             );
             """);
-
-        db.CheckResult(result, $"Could not create '{table}' database table");
+        stmt.Execute(b => b.Text(1, table));
     }
 
     /// <summary>
     /// Drops a table with the specified name if it exists. This will delete all indexes, views, etc.
     /// </summary>
     /// <param name="table">The name of the table to drop.</param>
-    /// <exception cref="Exception">Thrown if the table cannot be dropped.</exception>
+    /// <exception cref="NoSQLiteException">Thrown if the table cannot be dropped.</exception>
     public void DropTable(string table)
     {
-        var result = sqlite3_exec(db, $"""
+        using var stmt = new SQLiteStmt(db, $"""
             DROP TABLE IF EXISTS "{table}";
-            """);
-
-        db.CheckResult(result, $"Could not drop '{table}' database table");
-    }
-
-    /// <summary>
-    /// Drops the table and then creates it again. This will delete all indexes, views, etc.
-    /// </summary>
-    /// <param name="table">The name of the table to drop and recreate.</param>
-    /// <remarks>See <see href="https://sqlite.org/lang_droptable.html"/> for more info.</remarks>
-    public void DropAndCreateTable(string table)
-    {
-        DropTable(table);
-        CreateTable(table);
-    }
-
-    /// <summary>
-    /// Deletes all rows from a table.
-    /// </summary>
-    /// <param name="table">The name of the table to clear.</param>
-    public void Clear(string table)
-    {
-        sqlite3_exec(db, $"""DELETE FROM "{table}";""");
-    }
-
-    /// <summary>
-    /// Executes a write-ahead log (WAL) checkpoint for the database.
-    /// </summary>
-    /// <remarks>See <see href="https://sqlite.org/c3ref/wal_checkpoint.html"/> for more info.</remarks>
-    public void Checkpoint()
-    {
-        sqlite3_wal_checkpoint(db, Name);
+        """);
+        stmt.Execute(b => b.Text(1, table));
     }
 
     /// <summary>
@@ -188,15 +125,12 @@ public sealed class NoSQLiteConnection : IDisposable
         var length = tables.Count;
         var buffer = ArrayPool<NoSQLiteTable>.Shared.Rent(length);
         tables.Values.CopyTo(buffer, 0);
+        tables.Clear();
 
         for (int i = 0; i < length; i++) buffer[i].Dispose();
 
         ArrayPool<NoSQLiteTable>.Shared.Return(buffer, true);
 
-        if (disposeDb)
-        {
-            sqlite3_close_v2(db);
-            db.Dispose();
-        }
+        if (tableExistsStmt.IsValueCreated) tableExistsStmt.Value.Dispose();
     }
 }

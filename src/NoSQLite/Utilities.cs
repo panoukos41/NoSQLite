@@ -1,28 +1,122 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 
 namespace NoSQLite;
 
-using static SQLitePCL.raw;
-
-internal static class Throw
-{
-    public static void KeyNotFound(bool condition, [InterpolatedStringHandlerArgument("condition")] ref ConditionInterpolation message)
-    {
-        if (condition)
-        {
-            throw new KeyNotFoundException(message.ToString());
-        }
-    }
-}
-
+/// <summary>
+/// Provides extension methods for SQLite result checking.
+/// </summary>
 internal static class Extensions
 {
-    public static void CheckResult(this sqlite3 db, int result, [InterpolatedStringHandlerArgument("result")] ref SQLiteCodeInterpolation message)
+    /// <summary>
+    /// Checks the SQLite result code and throws a <see cref="NoSQLiteException"/> if the result indicates an error.
+    /// </summary>
+    /// <param name="db">The SQLite database handle.</param>
+    /// <param name="result">The SQLite result code to check.</param>
+    /// <param name="message">The interpolated message to include in the exception if thrown.</param>
+    /// <returns>The original <paramref name="result"/> if no error is detected.</returns>
+    /// <exception cref="NoSQLiteException">Thrown when the result code indicates an error.</exception>
+    public static int CheckResult(this sqlite3 db, int result, [InterpolatedStringHandlerArgument("result")] ref SQLiteCodeInterpolation message)
     {
         if (message.ShouldThrow)
         {
             throw new NoSQLiteException($"{message.ToString()}. SQLite info, code: {result}, message: {sqlite3_errmsg(db).utf8_to_string()}");
         }
+        return result;
+    }
+
+    /// <summary>
+    /// Checks the SQLite result code and throws a <see cref="NoSQLiteException"/> if the result indicates an error.
+    /// </summary>
+    /// <param name="result">The SQLite result code to check.</param>
+    /// <param name="db">The SQLite database handle.</param>
+    /// <param name="message">The interpolated message to include in the exception if thrown.</param>
+    /// <returns>The original <paramref name="result"/> if no error is detected.</returns>
+    /// <exception cref="NoSQLiteException">Thrown when the result code indicates an error.</exception>
+    public static int CheckResult(this int result, sqlite3 db, [InterpolatedStringHandlerArgument("result")] ref SQLiteCodeInterpolation message)
+    {
+        if (message.ShouldThrow)
+        {
+            throw new NoSQLiteException($"{message.ToString()}. SQLite info, code: {result}, message: {sqlite3_errmsg(db).utf8_to_string()}");
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Checks the SQLite result code and throws a <see cref="NoSQLiteException"/> if the result indicates an error.
+    /// </summary>
+    /// <param name="result">The SQLite result code to check.</param>
+    /// <param name="connection">The <see cref="NoSQLiteConnection"/> instance associated with the operation.</param>
+    /// <param name="message">The interpolated message to include in the exception if thrown.</param>
+    /// <returns>The original <paramref name="result"/> if no error is detected.</returns>
+    /// <exception cref="NoSQLiteException">Thrown when the result code indicates an error.</exception>
+    public static int CheckResult(this int result, NoSQLiteConnection connection, [InterpolatedStringHandlerArgument("result")] ref SQLiteCodeInterpolation message)
+    {
+        if (message.ShouldThrow)
+        {
+            throw new NoSQLiteException($"{message.ToString()}. SQLite info, code: {result}, message: {sqlite3_errmsg(connection.db).utf8_to_string()}");
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Extracts the property name from a lambda expression representing a property accessor.
+    /// </summary>
+    /// <typeparam name="T">The type containing the property.</typeparam>
+    /// <typeparam name="TKey">The type of the property.</typeparam>
+    /// <param name="expression">An expression representing a property accessor, e.g., <c>x => x.Property</c>.</param>
+    /// <returns>The name of the property accessed in the expression.</returns>
+    /// <exception cref="ArgumentException">Thrown when the expression does not represent a property access.</exception>
+    public static string GetPropertyName<T, TKey>(this Expression<Func<T, TKey>> expression)
+    {
+        if (expression.Body is MemberExpression memberExpression)
+        {
+            return memberExpression.Member.Name;
+        }
+
+        if (expression.Body is UnaryExpression unaryExpression && unaryExpression.Operand is MemberExpression operand)
+        {
+            return operand.Member.Name;
+        }
+
+        throw new ArgumentException("Invalid expression. Expected a property access expression.", nameof(expression));
+    }
+
+    /// <summary>
+    /// Extracts the full property path from a lambda expression representing a property accessor.
+    /// </summary>
+    /// <typeparam name="T">The type containing the property.</typeparam>
+    /// <typeparam name="TKey">The type of the property.</typeparam>
+    /// <param name="expression">An expression representing a property accessor, e.g., <c>x => x.Nested.Property</c>.</param>
+    /// <returns>The full path of the property accessed in the expression, e.g., "Nested.Property".</returns>
+    /// <exception cref="ArgumentException">Thrown when the expression does not represent a property access.</exception>
+    public static string GetPropertyPath<T, TKey>(this Expression<Func<T, TKey>> expression)
+    {
+        static string BuildPath(Expression? expr)
+        {
+            if (expr is MemberExpression memberExpression)
+            {
+                var parentPath = BuildPath(memberExpression.Expression);
+                return string.IsNullOrEmpty(parentPath)
+                    ? memberExpression.Member.Name
+                    : $"{parentPath}.{memberExpression.Member.Name}";
+            }
+
+            if (expr is UnaryExpression unaryExpression)
+            {
+                return BuildPath(unaryExpression.Operand);
+            }
+
+            return string.Empty;
+        }
+
+        var path = BuildPath(expression.Body);
+        if (string.IsNullOrEmpty(path))
+        {
+            throw new ArgumentException("Invalid expression. Expected a property access expression.", nameof(expression));
+        }
+
+        return path;
     }
 }
 

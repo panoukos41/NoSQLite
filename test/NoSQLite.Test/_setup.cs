@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using SQLitePCL;
+using System.Runtime.CompilerServices;
 
 namespace NoSQLite.Test;
 
@@ -11,46 +12,52 @@ public static class ModuleInitializer
     }
 }
 
-public abstract class TestBase<TSelf>
+public abstract class TestBase
 {
-    public static string DbPath { get; private set; } = null!;
+    protected string DbPath { get; private set; } = null!;
 
-    public static NoSQLiteConnection Connection { get; private set; } = null!;
+    protected sqlite3 Db { get; private set; } = null!;
 
-    public static bool Delete { get; set; } = true;
+    protected NoSQLiteConnection Connection { get; private set; } = null!;
 
-    [Before(Class)]
-    public static async Task BeforeAsync()
+    private bool Delete { get; } = true;
+
+    [Before(HookType.Test)]
+    public async Task BeforeAsync()
     {
-        DbPath = Path.Combine(Environment.CurrentDirectory, $"{typeof(TSelf).Name}.sqlite3");
+        var dir = Path.Combine(Environment.CurrentDirectory, "databases");
+        var now = TimeProvider.System.GetTimestamp();
+        DbPath = Path.Combine(dir, $"{GetType().Name}_{now}.sqlite3");
 
-        if (File.Exists(DbPath))
+        if (!Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+        if (Delete && File.Exists(DbPath))
         {
             File.Delete(DbPath);
         }
 
-        Connection = new NoSQLiteConnection(DbPath);
+        Batteries_V2.Init();
+        Db = sqlite3.Create(DbPath, useWal: true);
+        Connection = new NoSQLiteConnection(Db);
 
-        await That(File.Exists(Connection.Path)).IsTrue();
+        await That(File.Exists(DbPath)).IsTrue();
     }
 
-    public static NoSQLiteTable GetTable([CallerMemberName] string? caller = null)
+    public NoSQLiteTable GetTable([CallerMemberName] string? caller = null)
     {
-        return Connection.GetTable($"{caller}_{Guid.NewGuid()}");
+        return Connection.GetTable($"{caller}");
     }
 
-    public static NoSQLiteTable GetTable<T>(IDictionary<string, T> initPairs, [CallerMemberName] string? caller = null)
-    {
-        var table = GetTable(caller);
-        table.InsertMany(initPairs);
-        return table;
-    }
-
-    [After(Assembly)]
-    public static async Task AfterAsync()
+    [After(HookType.Test)]
+    public async Task AfterAsync()
     {
         Connection.Dispose();
+        Db.CloseAndDispose();
         await That(Connection.Tables.Count).IsEqualTo(0);
+        await That(File.Exists($"{DbPath}-shm")).IsFalse();
+        await That(File.Exists($"{DbPath}-wal")).IsFalse();
 
         if (Delete)
         {
