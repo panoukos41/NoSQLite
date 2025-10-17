@@ -55,7 +55,8 @@ public sealed class Table : TestBase
     [Arguments("")]
     public async Task Index(string indexName)
     {
-        var table = Connection.GetTable("indexes");
+        var tableName = "index";
+        var table = Connection.GetTable(tableName);
 
         await That(table.IndexExists(indexName)).IsFalse();
 
@@ -64,18 +65,64 @@ public sealed class Table : TestBase
         await That(table.IndexExists(indexName)).IsTrue();
 
         // test plan index
-        using var planStmt = new SQLiteStmt(Db, """
+        using var planStmt = new SQLiteStmt(Db, $"""
             EXPLAIN QUERY PLAN
             SELECT *
-            FROM "indexes"
+            FROM "{tableName}"
             WHERE "documents"->'$.Id' = '10';
             """);
 
         var result = planStmt.Execute(null, r => r.Text(3));
-        await That(result).IsEqualTo($"SEARCH indexes USING INDEX indexes_{indexName} (<expr>=?)");
+        await That(result).IsEqualTo($"SEARCH {tableName} USING INDEX {tableName}_{indexName} (<expr>=?)");
 
         table.DeleteIndex(indexName);
 
         await That(table.IndexExists(indexName)).IsFalse();
+    }
+
+    [Test]
+    public async Task Index_Unique()
+    {
+        var indexName = "id";
+        var tableName = "unique";
+        var table = Connection.GetTable(tableName);
+
+        await That(table.IndexExists(indexName)).IsFalse();
+
+        table.CreateIndex<TestPerson, int>(p => p.Id, indexName, unique: true);
+
+        await That(table.IndexExists(indexName)).IsTrue();
+
+        // test plan index
+        using var planStmt = new SQLiteStmt(Db, $"""
+            EXPLAIN QUERY PLAN
+            SELECT *
+            FROM "{tableName}"
+            WHERE "documents"->'$.Id' = '10';
+            """);
+
+        var result = planStmt.Execute(null, r => r.Text(3));
+        await That(result).IsEqualTo($"SEARCH {tableName} USING INDEX {tableName}_{indexName} (<expr>=?)");
+
+        // insert two times
+        var personFaker = new PersonFaker();
+        var person = personFaker.Generate();
+        await That(() => table.Insert(person)).ThrowsNothing();
+
+        // second time throws
+        await That(() => table.Insert(person)).Throws<NoSQLiteException>();
+
+        // count remains only one person
+        await That(table.Count()).IsEqualTo(1);
+
+        // delete index
+        table.DeleteIndex(indexName);
+        await That(table.IndexExists(indexName)).IsFalse();
+
+        // insert doesnt throw
+        await That(() => table.Insert(person)).ThrowsNothing();
+
+        // count goes up to two people
+        await That(table.Count()).IsEqualTo(2);
     }
 }

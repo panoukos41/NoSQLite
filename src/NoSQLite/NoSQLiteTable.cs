@@ -190,13 +190,13 @@ public sealed class NoSQLiteTable : IDisposable
         return stmt.Execute(b => b.Text(1, index), static r => r.Result is SQLITE_ROW, shouldThrow: false);
     }
 
-    public void CreateIndex<T, TKey>(Expression<Func<T, TKey>> selector, string indexName)
+    public void CreateIndex<T, TKey>(Expression<Func<T, TKey>> selector, string indexName, bool unique = false)
     {
         var propertyPath = selector.GetPropertyPath();
 
         // can't use parameter (?) here so we have to create a new statement every time.
         using var stmt = new SQLiteStmt(db, $"""
-            CREATE INDEX IF NOT EXISTS "{Table}_{indexName}"
+            CREATE{(unique ? " UNIQUE" : "")} INDEX IF NOT EXISTS "{Table}_{indexName}"
             ON "{Table}" ("documents"->'$.{propertyPath}')
             """);
 
