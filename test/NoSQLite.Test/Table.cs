@@ -7,7 +7,11 @@ public sealed class Table : TestBase
     [
         () => null,
         () => JsonSerializerOptions.Default,
+#if NET9_0_OR_GREATER
         () => new(JsonSerializerOptions.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull },
+#else
+        () => new(JsonSerializerOptions.Default) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull },
+#endif
     ];
 
     public Table(JsonSerializerOptions? jsonOptions) : base(jsonOptions)
