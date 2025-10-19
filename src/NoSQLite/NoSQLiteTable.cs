@@ -1,5 +1,8 @@
 ﻿namespace NoSQLite;
 
+/// <summary>
+/// Represents a table in a NoSQLite database, providing methods to manage documents and indexes.
+/// </summary>
 [Preserve(AllMembers = true)]
 public sealed class NoSQLiteTable : IDisposable
 {
@@ -18,10 +21,19 @@ public sealed class NoSQLiteTable : IDisposable
         connection.CreateTable(table);
     }
 
+    /// <summary>
+    /// Gets the <see cref="NoSQLiteConnection"/> associated with this table.
+    /// </summary>
     public NoSQLiteConnection Connection { get; }
 
+    /// <summary>
+    /// Gets the name of the table.
+    /// </summary>
     public string Table { get; }
 
+    /// <summary>
+    /// Gets the <see cref="JsonSerializerOptions"/> used for JSON serialization and deserialization.
+    /// </summary>
     public JsonSerializerOptions? JsonOptions => Connection.JsonOptions;
 
     internal SQLiteStmt NewStmt(string sql) => new(db, JsonOptions, sql, disposables);
@@ -32,6 +44,10 @@ public sealed class NoSQLiteTable : IDisposable
         SELECT count(*) FROM "{Table}"
         """);
 
+    /// <summary>
+    /// Gets the number of documents in the table.
+    /// </summary>
+    /// <returns>The count of documents as an <see cref="int"/>.</returns>
     public int Count()
     {
         return CountStmt.Execute(null, static r => r.Int(0));
@@ -41,6 +57,10 @@ public sealed class NoSQLiteTable : IDisposable
         SELECT count(*) FROM "{Table}"
         """);
 
+    /// <summary>
+    /// Gets the number of documents in the table as a <see cref="long"/>.
+    /// </summary>
+    /// <returns>The count of documents as a <see cref="long"/>.</returns>
     public long LongCount()
     {
         return LongCountStmt.Execute(null, static r => r.Long(0));
@@ -50,6 +70,11 @@ public sealed class NoSQLiteTable : IDisposable
         SELECT "documents" FROM "{Table}"
         """);
 
+    /// <summary>
+    /// Gets all documents in the table as an array of type <typeparamref name="T"/>.
+    /// </summary>
+    /// <typeparam name="T">The type to deserialize each document to.</typeparam>
+    /// <returns>An array of all documents in the table.</returns>
     public T[] All<T>()
     {
         return AllStmt.ExecuteMany(null, static r => r.Deserialize<T>(0)!);
@@ -59,6 +84,9 @@ public sealed class NoSQLiteTable : IDisposable
         DELETE FROM "{Table}"
         """);
 
+    /// <summary>
+    /// Removes all documents from the table.
+    /// </summary>
     public void Clear()
     {
         ClearStmt.Execute(null);
@@ -69,6 +97,14 @@ public sealed class NoSQLiteTable : IDisposable
         WHERE "documents"->('$.' || ?) = ?;
         """);
 
+    /// <summary>
+    /// Determines whether a document with the specified key exists in the table.
+    /// </summary>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <param name="selector">An expression selecting the key property.</param>
+    /// <param name="key">The key value to search for.</param>
+    /// <returns><see langword="true"/> if a document with the specified key exists; otherwise, <see langword="false"/>.</returns>
     public bool Exists<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
     {
         var propertyPath = selector.GetPropertyPath(JsonOptions);
@@ -90,6 +126,15 @@ public sealed class NoSQLiteTable : IDisposable
         WHERE "documents"->('$.' || ?) = ?
         """);
 
+    /// <summary>
+    /// Finds and returns a document by key.
+    /// </summary>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <param name="selector">An expression selecting the key property.</param>
+    /// <param name="key">The key value to search for.</param>
+    /// <returns>The document matching the specified key.</returns>
+    /// <exception cref="NoSQLiteException">Thrown if the key is not found.</exception>
     public T Find<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
     {
         var propertyPath = selector.GetPropertyPath(JsonOptions);
@@ -114,6 +159,16 @@ public sealed class NoSQLiteTable : IDisposable
         WHERE "documents"->('$.' || ?) = ?
         """);
 
+    /// <summary>
+    /// Finds and returns a property value from a document by key.
+    /// </summary>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <typeparam name="TProperty">The property type.</typeparam>
+    /// <param name="keySelector">An expression selecting the key property.</param>
+    /// <param name="propertySelector">An expression selecting the property to retrieve.</param>
+    /// <param name="key">The key value to search for.</param>
+    /// <returns>The property value, or <c>null</c> if not found.</returns>
     public TProperty? FindProperty<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty?>> propertySelector, TKey key)
     {
         var keyPropertyPath = keySelector.GetPropertyPath(JsonOptions);
@@ -135,6 +190,11 @@ public sealed class NoSQLiteTable : IDisposable
         INSERT INTO "{Table}"("documents") VALUES (json(?))
         """);
 
+    /// <summary>
+    /// Adds a new document to the table.
+    /// </summary>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <param name="obj">The document to add.</param>
     public void Add<T>(T obj)
     {
         var document = JsonSerializer.SerializeToUtf8Bytes(obj, JsonOptions);
@@ -148,6 +208,13 @@ public sealed class NoSQLiteTable : IDisposable
         WHERE "documents"->('$.' || ?) = ?;
         """);
 
+    /// <summary>
+    /// Updates an existing document in the table.
+    /// </summary>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <param name="document">The updated document.</param>
+    /// <param name="selector">An expression selecting the key property.</param>
     public void Update<T, TKey>(T document, Expression<Func<T, TKey>> selector)
     {
         var propertyPath = selector.GetPropertyPath(JsonOptions);
@@ -161,16 +228,23 @@ public sealed class NoSQLiteTable : IDisposable
         });
     }
 
-    private SQLiteStmt RemoveStmt => field ??= NewStmt($"""
+    private SQLiteStmt DeleteStmt => field ??= NewStmt($"""
         DELETE FROM "{Table}"
         WHERE "documents"->('$.' || ?) = ?;
         """);
 
-    public void Remove<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
+    /// <summary>
+    /// Deletes a document from the table by key.
+    /// </summary>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <param name="selector">An expression selecting the key property.</param>
+    /// <param name="key">The key value of the document to remove.</param>
+    public void Delete<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
     {
         var propertyPath = selector.GetPropertyPath(JsonOptions);
 
-        RemoveStmt.Execute(b =>
+        DeleteStmt.Execute(b =>
         {
             b.Text(1, propertyPath);
             b.JsonText(2, key);
@@ -184,6 +258,20 @@ public sealed class NoSQLiteTable : IDisposable
         WHERE "documents"->('$.' || ?) = ?
         """);
 
+    /// <summary>
+    /// Inserts a property value into a document by key.
+    /// </summary>
+    /// <remarks>
+    /// Overwrite if already exists? <b>NO</b> (including <see langword="null"/> values, only the key matters). <br/>
+    /// Create if does not exist? <b>YES</b>
+    /// </remarks>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <typeparam name="TProperty">The property type.</typeparam>
+    /// <param name="keySelector">An expression selecting the key property.</param>
+    /// <param name="propertySelector">An expression selecting the property to insert.</param>
+    /// <param name="key">The key value of the document.</param>
+    /// <param name="value">The property value to insert.</param>
     public void Insert<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty?>> propertySelector, TKey key, TProperty? value)
     {
         var keyPropertyPath = keySelector.GetPropertyPath(JsonOptions);
@@ -206,6 +294,20 @@ public sealed class NoSQLiteTable : IDisposable
         WHERE "documents"->('$.' || ?) = ?
         """);
 
+    /// <summary>
+    /// Replaces a property value in a document by key.
+    /// </summary>
+    /// <remarks>
+    /// Overwrite if already exists? <b>YES</b> (<see langword="null"/> values won't remove the key). <br/>
+    /// Create if does not exist? <b>NO</b>
+    /// </remarks>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <typeparam name="TProperty">The property type.</typeparam>
+    /// <param name="keySelector">An expression selecting the key property.</param>
+    /// <param name="propertySelector">An expression selecting the property to replace.</param>
+    /// <param name="key">The key value of the document.</param>
+    /// <param name="value">The property value to replace.</param>
     public void Replace<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty?>> propertySelector, TKey key, TProperty? value)
     {
         var keyPropertyPath = keySelector.GetPropertyPath(JsonOptions);
@@ -228,6 +330,20 @@ public sealed class NoSQLiteTable : IDisposable
         WHERE "documents"->('$.' || ?) = ?
         """);
 
+    /// <summary>
+    /// Sets a property value in a document by key.
+    /// </summary>
+    /// <remarks>
+    /// Overwrite if already exists? <b>YES</b> <br/>
+    /// Create if does not exist? <b>YES</b>
+    /// </remarks>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <typeparam name="TProperty">The property type.</typeparam>
+    /// <param name="keySelector">An expression selecting the key property.</param>
+    /// <param name="propertySelector">An expression selecting the property to set.</param>
+    /// <param name="key">The key value of the document.</param>
+    /// <param name="value">The property value to set.</param>
     public void Set<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty?>> propertySelector, TKey key, TProperty? value)
     {
         var keyPropertyPath = keySelector.GetPropertyPath(JsonOptions);
@@ -243,6 +359,11 @@ public sealed class NoSQLiteTable : IDisposable
         });
     }
 
+    /// <summary>
+    /// Determines whether an index with the specified name exists for this table.
+    /// </summary>
+    /// <param name="indexName">The name of the index to check.</param>
+    /// <returns><see langword="true"/> if the index exists; otherwise, <see langword="false"/>.</returns>
     public bool IndexExists(string indexName)
     {
         using var stmt = new SQLiteStmt(db, JsonOptions, """
@@ -255,6 +376,14 @@ public sealed class NoSQLiteTable : IDisposable
         return stmt.Execute(b => b.Text(1, index), static r => r.Result is SQLITE_ROW, shouldThrow: false);
     }
 
+    /// <summary>
+    /// Creates an index on the specified property of the documents in the table.
+    /// </summary>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <param name="selector">An expression selecting the property to index.</param>
+    /// <param name="indexName">The name of the index to create.</param>
+    /// <param name="unique">Whether the index should enforce uniqueness.</param>
     public void CreateIndex<T, TKey>(Expression<Func<T, TKey>> selector, string indexName, bool unique = false)
     {
         var propertyPath = selector.GetPropertyPath(JsonOptions);
@@ -268,6 +397,11 @@ public sealed class NoSQLiteTable : IDisposable
         stmt.Execute(null);
     }
 
+    /// <summary>
+    /// Deletes an index with the specified name from this table.
+    /// </summary>
+    /// <param name="indexName">The name of the index to delete.</param>
+    /// <returns><see langword="true"/> if the index was deleted; otherwise, <see langword="false"/>.</returns>
     public bool DeleteIndex(string indexName)
     {
         using var stmt = new SQLiteStmt(db, JsonOptions, $"""

@@ -1,8 +1,9 @@
-﻿using System.Collections;
-using System.Text.Json;
+﻿namespace NoSQLite;
 
-namespace NoSQLite;
-
+/// <summary>
+/// Represents a prepared SQLite statement, providing methods for execution with parameter binding and result retrieval.
+/// </summary>
+[Preserve(AllMembers = true)]
 internal sealed class SQLiteStmt : IDisposable
 {
 #if NET9_0_OR_GREATER
@@ -107,25 +108,54 @@ internal sealed class SQLiteStmt : IDisposable
     }
 
     /// <summary>
-    /// Finalize this statement.
+    /// Finalizes this statement and releases associated resources.
     /// </summary>
     public void Dispose()
     {
         sqlite3_finalize(stmt);
     }
 
+    /// <summary>
+    /// Implicitly converts a <see cref="SQLiteStmt"/> to its underlying <see cref="sqlite3"/> database connection.
+    /// </summary>
+    /// <param name="stmt">The <see cref="SQLiteStmt"/> instance.</param>
     public static implicit operator sqlite3(SQLiteStmt stmt) => stmt.db;
 
+    /// <summary>
+    /// Implicitly converts a <see cref="SQLiteStmt"/> to its underlying <see cref="sqlite3_stmt"/> statement handle.
+    /// </summary>
+    /// <param name="stmt">The <see cref="SQLiteStmt"/> instance.</param>
     public static implicit operator sqlite3_stmt(SQLiteStmt stmt) => stmt.stmt;
 
-    public static implicit operator JsonSerializerOptions(SQLiteStmt stmt) => stmt.jsonOptions;
+    /// <summary>
+    /// Implicitly converts a <see cref="SQLiteStmt"/> to its associated <see cref="JsonSerializerOptions"/>.
+    /// </summary>
+    /// <param name="stmt">The <see cref="SQLiteStmt"/> instance.</param>
+    public static implicit operator JsonSerializerOptions?(SQLiteStmt stmt) => stmt.jsonOptions;
 
+    /// <summary>
+    /// Represents a single step execution of a SQLite statement, providing result retrieval and automatic reset.
+    /// </summary>
+    /// <typeparam name="TResult">The type of the result returned by the reader function.</typeparam>
     private readonly ref struct SQLiteStep<TResult> : IDisposable
     {
+        /// <summary>
+        /// The parent <see cref="SQLiteStmt"/> instance.
+        /// </summary>
         private readonly SQLiteStmt stmt;
 
+        /// <summary>
+        /// Gets the result produced by the reader function after statement execution.
+        /// </summary>
         public TResult Result { get; }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SQLiteStep{TResult}"/> struct.
+        /// </summary>
+        /// <param name="stmt">The parent <see cref="SQLiteStmt"/> instance.</param>
+        /// <param name="bind">An optional delegate that binds parameters to the statement before execution.</param>
+        /// <param name="read">A delegate that processes the <see cref="SQLiteResultReader"/> and returns a result of type <typeparamref name="TResult"/>.</param>
+        /// <param name="shouldThrow">Indicates whether exceptions should be thrown on errors.</param>
         public SQLiteStep(SQLiteStmt stmt, SQLiteWriterFunc<SQLiteParameterBinder>? bind, SQLiteReaderFunc<SQLiteResultReader, TResult> read, bool shouldThrow)
         {
             this.stmt = stmt;
@@ -138,12 +168,19 @@ internal sealed class SQLiteStmt : IDisposable
             }
         }
 
+        /// <summary>
+        /// Resets the statement after execution.
+        /// </summary>
         public void Dispose()
         {
             sqlite3_reset(stmt);
         }
     }
 
+    /// <summary>
+    /// Enumerates multiple result rows from an SQLite statement, providing result retrieval and automatic reset.
+    /// </summary>
+    /// <typeparam name="TResult">The type of the result returned by the reader function.</typeparam>
     private ref struct SQLiteSteps<TResult> : IEnumerator<TResult>, IDisposable
     {
         private readonly SQLiteStmt stmt;
@@ -152,6 +189,13 @@ internal sealed class SQLiteStmt : IDisposable
 
         public TResult Current { get; private set; } = default!;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SQLiteSteps{TResult}"/> struct.
+        /// </summary>
+        /// <param name="stmt">The parent <see cref="SQLiteStmt"/> instance.</param>
+        /// <param name="bind">An optional delegate that binds parameters to the statement before execution.</param>
+        /// <param name="read">A delegate that processes the <see cref="SQLiteResultReader"/> and returns a result of type <typeparamref name="TResult"/>.</param>
+        /// <param name="shouldThrow">Indicates whether exceptions should be thrown on errors.</param>
         public SQLiteSteps(SQLiteStmt stmt, SQLiteWriterFunc<SQLiteParameterBinder>? bind, SQLiteReaderFunc<SQLiteResultReader, TResult> read, bool shouldThrow)
         {
             this.stmt = stmt;
@@ -182,6 +226,7 @@ internal sealed class SQLiteStmt : IDisposable
             sqlite3_clear_bindings(stmt);
         }
 
+        /// <inheritdoc/>
         readonly object IEnumerator.Current => Current!;
     }
 }

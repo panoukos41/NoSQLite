@@ -79,8 +79,8 @@ public sealed class Table : TestBase
         table.Set<TestPerson, int, string>(p => p.Id, p => p.Name, id, "test from set");
         await That(table.FindProperty<TestPerson, int, string>(p => p.Id, p => p.Name, id)).IsEqualTo("test from set");
 
-        // Remove, (Assert) Exists, Count, LongCount, All
-        table.Remove<TestPerson, int>(p => p.Id, id);
+        // Delete, (Assert) Exists, Count, LongCount, All
+        table.Delete<TestPerson, int>(p => p.Id, id);
         await That(table.Exists<TestPerson, int>(p => p.Id, id)).IsFalse();
         await That(table.Count()).IsEqualTo(9);
         await That(table.LongCount()).IsEqualTo(9);
