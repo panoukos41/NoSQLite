@@ -24,7 +24,7 @@ internal sealed class SQLiteStmt : IDisposable
     /// <param name="jsonOptions">Optional JSON serializer options for deserialization operations.</param>
     /// <param name="sql">The SQL statement to prepare and execute as a string.</param>
     /// <param name="disposables">An optional list to which this statement will be added for disposal management.</param>
-    public SQLiteStmt(sqlite3 db, JsonSerializerOptions? jsonOptions, string sql, List<IDisposable>? disposables = null)
+    public SQLiteStmt(sqlite3 db, JsonSerializerOptions? jsonOptions, string sql, List<SQLiteStmt>? disposables = null)
     {
         this.db = db;
         this.jsonOptions = jsonOptions;
@@ -40,7 +40,7 @@ internal sealed class SQLiteStmt : IDisposable
     /// <param name="jsonOptions">Optional JSON serializer options for deserialization operations.</param>
     /// <param name="sql">The SQL statement to prepare and execute as a <see cref="ReadOnlySpan{byte}"/>.</param>
     /// <param name="disposables">An optional list to which this statement will be added for disposal management.</param>
-    public SQLiteStmt(sqlite3 db, JsonSerializerOptions? jsonOptions, ReadOnlySpan<byte> sql, List<IDisposable>? disposables = null)
+    public SQLiteStmt(sqlite3 db, JsonSerializerOptions? jsonOptions, ReadOnlySpan<byte> sql, List<SQLiteStmt>? disposables = null)
     {
         this.db = db;
         this.jsonOptions = jsonOptions;

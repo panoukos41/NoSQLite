@@ -6,9 +6,9 @@ namespace NoSQLite;
 /// Represents a table in a NoSQLite database, providing methods to manage documents and indexes.
 /// </summary>
 [Preserve(AllMembers = true)]
-public sealed class NoSQLiteTable : IDisposable
+public sealed class NoSQLiteTable
 {
-    private readonly List<IDisposable> disposables = [];
+    private readonly List<SQLiteStmt> statements = [];
     private readonly sqlite3 db;
 
     internal NoSQLiteTable(string table, NoSQLiteConnection connection)
@@ -38,9 +38,9 @@ public sealed class NoSQLiteTable : IDisposable
     /// </summary>
     public JsonSerializerOptions? JsonOptions => Connection.JsonOptions;
 
-    internal SQLiteStmt NewStmt(string sql) => new(db, JsonOptions, sql, disposables);
+    internal SQLiteStmt NewStmt(string sql) => new(db, JsonOptions, sql, statements);
 
-    internal SQLiteStmt NewStmt(ReadOnlySpan<byte> sql) => new(db, JsonOptions, sql, disposables);
+    internal SQLiteStmt NewStmt(ReadOnlySpan<byte> sql) => new(db, JsonOptions, sql, statements);
 
     private SQLiteStmt CountStmt => field ??= NewStmt($"""
         SELECT count(*) FROM "{Table}"
@@ -419,22 +419,22 @@ public sealed class NoSQLiteTable : IDisposable
     /// <remarks>
     /// Disposes all prepared statements.
     /// </remarks>
-    public void Dispose()
+    internal void Dispose()
     {
-        if (disposables.Count <= 0) return;
+        if (statements.Count <= 0) return;
 
-        var length = disposables.Count;
-        var buffer = ArrayPool<NoSQLiteTable>.Shared.Rent(length);
+        var length = statements.Count;
+        var buffer = ArrayPool<SQLiteStmt>.Shared.Rent(length);
         try
         {
-            disposables.CopyTo(buffer, 0);
-            disposables.Clear();
+            statements.CopyTo(buffer, 0);
+            statements.Clear();
 
             for (int i = 0; i < length; i++) buffer[i].Dispose();
         }
         finally
         {
-            ArrayPool<NoSQLiteTable>.Shared.Return(buffer, true);
+            ArrayPool<SQLiteStmt>.Shared.Return(buffer, true);
         }
     }
 }
