@@ -1,9 +1,0 @@
-{
-  "profiles": {
-    "ConsoleApp": {
-      "commandName": "Project",
-      "commandLineArgs": "",
-      "workingDirectory": "."
-    }
-  }
-}

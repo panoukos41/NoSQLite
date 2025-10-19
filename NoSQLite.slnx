@@ -1,7 +1,4 @@
 <Solution>
-  <Folder Name="/sample/">
-    <Project Path="sample/ConsoleApp/ConsoleApp.csproj" />
-  </Folder>
   <Folder Name="/src/">
     <Project Path="src/NoSQLite/NoSQLite.csproj" />
   </Folder>
