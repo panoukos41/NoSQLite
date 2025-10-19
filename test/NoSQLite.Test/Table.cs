@@ -10,11 +10,8 @@ public sealed class Table : TestBase
         () => new(JsonSerializerOptions.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull },
     ];
 
-    protected override JsonSerializerOptions? JsonOptions { get; }
-
-    public Table(JsonSerializerOptions? jsonOptions)
+    public Table(JsonSerializerOptions? jsonOptions) : base(jsonOptions)
     {
-        JsonOptions = jsonOptions;
     }
 
     [Test]

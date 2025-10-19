@@ -20,9 +20,14 @@ public abstract class TestBase
 
     protected NoSQLiteConnection Connection { get; private set; } = null!;
 
-    protected virtual JsonSerializerOptions? JsonOptions { get; }
+    protected JsonSerializerOptions? JsonOptions { get; }
 
-    private bool Delete { get; } = false;
+    private bool Delete { get; } = true;
+
+    protected TestBase(JsonSerializerOptions? jsonOptions = null)
+    {
+        JsonOptions = jsonOptions;
+    }
 
     [Before(HookType.Test)]
     public async Task BeforeAsync()
