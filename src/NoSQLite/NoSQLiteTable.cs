@@ -1,4 +1,6 @@
-﻿namespace NoSQLite;
+﻿using System.Buffers;
+
+namespace NoSQLite;
 
 /// <summary>
 /// Represents a table in a NoSQLite database, providing methods to manage documents and indexes.
@@ -411,16 +413,28 @@ public sealed class NoSQLiteTable : IDisposable
         return stmt.Execute(null, static r => true);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Releases all resources used by the <see cref="NoSQLiteTable"/>.
+    /// </summary>
+    /// <remarks>
+    /// Disposes all prepared statements.
+    /// </remarks>
     public void Dispose()
     {
-        Connection.tables.Remove(Table, out _);
         if (disposables.Count <= 0) return;
 
-        var toDispose = new IDisposable[disposables.Count];
-        disposables.CopyTo(toDispose);
-        disposables.Clear();
+        var length = disposables.Count;
+        var buffer = ArrayPool<NoSQLiteTable>.Shared.Rent(length);
+        try
+        {
+            disposables.CopyTo(buffer, 0);
+            disposables.Clear();
 
-        foreach (var d in toDispose) d.Dispose();
+            for (int i = 0; i < length; i++) buffer[i].Dispose();
+        }
+        finally
+        {
+            ArrayPool<NoSQLiteTable>.Shared.Return(buffer, true);
+        }
     }
 }

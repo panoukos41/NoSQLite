@@ -110,26 +110,31 @@ public sealed partial class NoSQLiteConnection : IDisposable
     }
 
     /// <summary>
-    /// Releases all resources used by the <see cref="NoSQLiteConnection"/> and closes the underlying database connection.
+    /// Releases all resources used by the <see cref="NoSQLiteConnection"/>.
     /// </summary>
     /// <remarks>
-    /// This will close and dispose the underlying database connection and all associated tables.
+    /// Disposes all managed <see cref="NoSQLiteTable"/> instances and prepared statements.
     /// </remarks>
     public void Dispose()
     {
         if (!open) return;
 
         open = false;
-
         var length = tables.Count;
         var buffer = ArrayPool<NoSQLiteTable>.Shared.Rent(length);
-        tables.Values.CopyTo(buffer, 0);
-        tables.Clear();
+        try
+        {
+            tables.Values.CopyTo(buffer, 0);
+            tables.Clear();
 
-        for (int i = 0; i < length; i++) buffer[i].Dispose();
+            for (int i = 0; i < length; i++) buffer[i].Dispose();
 
-        ArrayPool<NoSQLiteTable>.Shared.Return(buffer, true);
+            if (tableExistsStmt.IsValueCreated) tableExistsStmt.Value.Dispose();
+        }
 
-        if (tableExistsStmt.IsValueCreated) tableExistsStmt.Value.Dispose();
+        finally
+        {
+            ArrayPool<NoSQLiteTable>.Shared.Return(buffer, true);
+        }
     }
 }
