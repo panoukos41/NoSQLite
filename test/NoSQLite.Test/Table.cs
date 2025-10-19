@@ -1,7 +1,22 @@
 ﻿namespace NoSQLite.Test;
 
+[MethodDataSource<Table>(nameof(Arguments))]
 public sealed class Table : TestBase
 {
+    public static IEnumerable<Func<JsonSerializerOptions?>> Arguments() =>
+    [
+        () => null,
+        () => JsonSerializerOptions.Default,
+        () => new(JsonSerializerOptions.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull },
+    ];
+
+    protected override JsonSerializerOptions? JsonOptions { get; }
+
+    public Table(JsonSerializerOptions? jsonOptions)
+    {
+        JsonOptions = jsonOptions;
+    }
+
     [Test]
     public async Task CRUD()
     {
@@ -11,7 +26,7 @@ public sealed class Table : TestBase
         // Insert
         foreach (var person in people)
         {
-            table.Insert(person);
+            table.Add(person);
         }
 
         // Count, LongCount, All
@@ -22,16 +37,47 @@ public sealed class Table : TestBase
         // Exists
         var id = 5;
         await That(table.Exists<TestPerson, int>(p => p.Id, id)).IsTrue();
+        await That(table.Exists<TestPerson, int>(p => p.Id, 15)).IsFalse();
 
         // Find
+        await That(() => table.Find<TestPerson, int>(p => p.Id, 15)).Throws<NoSQLiteException>().WithInnerException().And.IsTypeOf<KeyNotFoundException>();
         var person5 = await That(table.Find<TestPerson, int>(p => p.Id, id)).IsNotNull();
 
         // Update
-        person5.Name = "test";
+        person5!.Name = "test";
         table.Update(person5, p => p.Id);
 
-        // Select (todo)
+        // Select
         await That(table.FindProperty<TestPerson, int, string>(p => p.Id, p => p.Name, id)).IsEqualTo("test");
+
+        // Insert/Replace/Set
+        // Check conditions for where the value doesnt exist works only when options are set to not writting null
+        if (Connection.JsonOptions?.DefaultIgnoreCondition is JsonIgnoreCondition.WhenWritingNull)
+        {
+            // should not replace because it doesnt exist
+            table.Replace<TestPerson, int, string>(p => p.Id, p => p.Nonce, id, "r");
+            await That(table.FindProperty<TestPerson, int, string>(p => p.Id, p => p.Nonce, id)).IsEqualTo(null);
+
+            // should insert because it doesnt exist
+            table.Insert<TestPerson, int, string>(p => p.Id, p => p.Nonce, id, "inserted");
+            await That(table.FindProperty<TestPerson, int, string>(p => p.Id, p => p.Nonce, id)).IsEqualTo("inserted");
+
+            // should replace beacuse it exists
+            table.Replace<TestPerson, int, string>(p => p.Id, p => p.Nonce, id, "replaced");
+            await That(table.FindProperty<TestPerson, int, string>(p => p.Id, p => p.Nonce, id)).IsEqualTo("replaced");
+
+            // should set the value even if it deosnt exist
+            table.Set<TestPerson, int, string>(p => p.Id, p => p.Nonce2, id, "aaaaa");
+            await That(table.FindProperty<TestPerson, int, string>(p => p.Id, p => p.Nonce2, id)).IsEqualTo("aaaaa");
+        }
+
+        // Replace
+        table.Replace<TestPerson, int, bool>(p => p.Id, p => p.Sane, id, false);
+        await That(table.FindProperty<TestPerson, int, bool>(p => p.Id, p => p.Sane, id)).IsFalse();
+
+        // Set (should set regardles of existances or not)
+        table.Set<TestPerson, int, string>(p => p.Id, p => p.Name, id, "test from set");
+        await That(table.FindProperty<TestPerson, int, string>(p => p.Id, p => p.Name, id)).IsEqualTo("test from set");
 
         // Remove, (Assert) Exists, Count, LongCount, All
         table.Remove<TestPerson, int>(p => p.Id, id);
@@ -57,6 +103,7 @@ public sealed class Table : TestBase
     {
         var tableName = "index";
         var table = Connection.GetTable(tableName);
+        var propertyPath = Extensions.GetPropertyPath<TestPerson, int>(p => p.Id, Connection.JsonOptions);
 
         await That(table.IndexExists(indexName)).IsFalse();
 
@@ -65,11 +112,11 @@ public sealed class Table : TestBase
         await That(table.IndexExists(indexName)).IsTrue();
 
         // test plan index
-        using var planStmt = new SQLiteStmt(Db, $"""
+        using var planStmt = table.NewStmt($"""
             EXPLAIN QUERY PLAN
             SELECT *
             FROM "{tableName}"
-            WHERE "documents"->'$.Id' = '10';
+            WHERE "documents"->'$.{propertyPath}' = '10';
             """);
 
         var result = planStmt.Execute(null, r => r.Text(3));
@@ -86,6 +133,7 @@ public sealed class Table : TestBase
         var indexName = "id";
         var tableName = "unique";
         var table = Connection.GetTable(tableName);
+        var propertyPath = Extensions.GetPropertyPath<TestPerson, int>(p => p.Id, Connection.JsonOptions);
 
         await That(table.IndexExists(indexName)).IsFalse();
 
@@ -94,11 +142,11 @@ public sealed class Table : TestBase
         await That(table.IndexExists(indexName)).IsTrue();
 
         // test plan index
-        using var planStmt = new SQLiteStmt(Db, $"""
+        using var planStmt = table.NewStmt($"""
             EXPLAIN QUERY PLAN
             SELECT *
             FROM "{tableName}"
-            WHERE "documents"->'$.Id' = '10';
+            WHERE "documents"->'$.{propertyPath}' = '10';
             """);
 
         var result = planStmt.Execute(null, r => r.Text(3));
@@ -107,10 +155,10 @@ public sealed class Table : TestBase
         // insert two times
         var personFaker = new PersonFaker();
         var person = personFaker.Generate();
-        await That(() => table.Insert(person)).ThrowsNothing();
+        await That(() => table.Add(person)).ThrowsNothing();
 
         // second time throws
-        await That(() => table.Insert(person)).Throws<NoSQLiteException>();
+        await That(() => table.Add(person)).Throws<NoSQLiteException>();
 
         // count remains only one person
         await That(table.Count()).IsEqualTo(1);
@@ -120,7 +168,7 @@ public sealed class Table : TestBase
         await That(table.IndexExists(indexName)).IsFalse();
 
         // insert doesnt throw
-        await That(() => table.Insert(person)).ThrowsNothing();
+        await That(() => table.Add(person)).ThrowsNothing();
 
         // count goes up to two people
         await That(table.Count()).IsEqualTo(2);

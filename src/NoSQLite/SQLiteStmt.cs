@@ -5,37 +5,44 @@ namespace NoSQLite;
 
 internal sealed class SQLiteStmt : IDisposable
 {
-    private readonly sqlite3 db;
-    private readonly sqlite3_stmt stmt;
-
 #if NET9_0_OR_GREATER
     private readonly Lock locker = new();
 #else
     private readonly object locker = new();
 #endif
 
+    private readonly sqlite3 db;
+    private readonly sqlite3_stmt stmt;
+    private readonly JsonSerializerOptions? jsonOptions;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="SQLiteStmt"/> class using a SQL string.
+    /// Prepares the SQL statement for execution and optionally adds this instance to a disposables list.
     /// </summary>
     /// <param name="db">The SQLite database connection to use for this statement.</param>
+    /// <param name="jsonOptions">Optional JSON serializer options for deserialization operations.</param>
     /// <param name="sql">The SQL statement to prepare and execute as a string.</param>
     /// <param name="disposables">An optional list to which this statement will be added for disposal management.</param>
-    public SQLiteStmt(sqlite3 db, string sql, List<IDisposable>? disposables = null)
+    public SQLiteStmt(sqlite3 db, JsonSerializerOptions? jsonOptions, string sql, List<IDisposable>? disposables = null)
     {
         this.db = db;
+        this.jsonOptions = jsonOptions;
         sqlite3_prepare_v2(db, sql, out stmt);
         disposables?.Add(this);
     }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SQLiteStmt"/> class using a SQL byte span.
+    /// Prepares the SQL statement for execution and optionally adds this instance to a disposables list.
     /// </summary>
     /// <param name="db">The SQLite database connection to use for this statement.</param>
+    /// <param name="jsonOptions">Optional JSON serializer options for deserialization operations.</param>
     /// <param name="sql">The SQL statement to prepare and execute as a <see cref="ReadOnlySpan{byte}"/>.</param>
     /// <param name="disposables">An optional list to which this statement will be added for disposal management.</param>
-    public SQLiteStmt(sqlite3 db, ReadOnlySpan<byte> sql, List<IDisposable>? disposables = null)
+    public SQLiteStmt(sqlite3 db, JsonSerializerOptions? jsonOptions, ReadOnlySpan<byte> sql, List<IDisposable>? disposables = null)
     {
         this.db = db;
+        this.jsonOptions = jsonOptions;
         sqlite3_prepare_v2(db, sql, out stmt);
         disposables?.Add(this);
     }
@@ -50,7 +57,7 @@ internal sealed class SQLiteStmt : IDisposable
     {
         lock (locker)
         {
-            using var step = new SQLiteStep<object?>(db, stmt, bind, static read => null, shouldThrow);
+            using var step = new SQLiteStep<object?>(this, bind, static read => null, shouldThrow);
         }
     }
 
@@ -67,7 +74,7 @@ internal sealed class SQLiteStmt : IDisposable
     {
         lock (locker)
         {
-            using var step = new SQLiteStep<TResult>(db, stmt, bind, read, shouldThrow);
+            using var step = new SQLiteStep<TResult>(this, bind, read, shouldThrow);
             return step.Result;
         }
     }
@@ -89,7 +96,7 @@ internal sealed class SQLiteStmt : IDisposable
     {
         lock (locker)
         {
-            using var steps = new SQLiteSteps<TResult>(db, stmt, bind, read, shouldThrow);
+            using var steps = new SQLiteSteps<TResult>(this, bind, read, shouldThrow);
             var results = new List<TResult>();
             while (steps.MoveNext())
             {
@@ -107,17 +114,23 @@ internal sealed class SQLiteStmt : IDisposable
         sqlite3_finalize(stmt);
     }
 
+    public static implicit operator sqlite3(SQLiteStmt stmt) => stmt.db;
+
+    public static implicit operator sqlite3_stmt(SQLiteStmt stmt) => stmt.stmt;
+
+    public static implicit operator JsonSerializerOptions(SQLiteStmt stmt) => stmt.jsonOptions;
+
     private readonly ref struct SQLiteStep<TResult> : IDisposable
     {
-        private readonly sqlite3_stmt stmt;
+        private readonly SQLiteStmt stmt;
 
         public TResult Result { get; }
 
-        public SQLiteStep(sqlite3 db, sqlite3_stmt stmt, SQLiteWriterFunc<SQLiteParameterBinder>? bind, SQLiteReaderFunc<SQLiteResultReader, TResult> read, bool shouldThrow)
+        public SQLiteStep(SQLiteStmt stmt, SQLiteWriterFunc<SQLiteParameterBinder>? bind, SQLiteReaderFunc<SQLiteResultReader, TResult> read, bool shouldThrow)
         {
             this.stmt = stmt;
             bind?.Invoke(new(stmt));
-            var result = shouldThrow ? sqlite3_step(stmt).CheckResult(db, $"") : sqlite3_step(stmt);
+            var result = shouldThrow ? sqlite3_step(stmt).CheckResult(stmt.db, $"") : sqlite3_step(stmt);
             Result = read(new(stmt, result));
             if (bind is { })
             {
@@ -133,16 +146,14 @@ internal sealed class SQLiteStmt : IDisposable
 
     private ref struct SQLiteSteps<TResult> : IEnumerator<TResult>, IDisposable
     {
-        private readonly sqlite3 db;
-        private readonly sqlite3_stmt stmt;
+        private readonly SQLiteStmt stmt;
         private readonly SQLiteReaderFunc<SQLiteResultReader, TResult> read;
         private readonly bool shouldThrow;
 
         public TResult Current { get; private set; } = default!;
 
-        public SQLiteSteps(sqlite3 db, sqlite3_stmt stmt, SQLiteWriterFunc<SQLiteParameterBinder>? bind, SQLiteReaderFunc<SQLiteResultReader, TResult> read, bool shouldThrow)
+        public SQLiteSteps(SQLiteStmt stmt, SQLiteWriterFunc<SQLiteParameterBinder>? bind, SQLiteReaderFunc<SQLiteResultReader, TResult> read, bool shouldThrow)
         {
-            this.db = db;
             this.stmt = stmt;
             this.read = read;
             this.shouldThrow = shouldThrow;
@@ -151,7 +162,7 @@ internal sealed class SQLiteStmt : IDisposable
 
         public bool MoveNext()
         {
-            var result = shouldThrow ? sqlite3_step(stmt).CheckResult(db, $"") : sqlite3_step(stmt);
+            var result = shouldThrow ? sqlite3_step(stmt).CheckResult(stmt.db, $"") : sqlite3_step(stmt);
             if (result is not SQLITE_ROW)
             {
                 return false;
@@ -181,9 +192,9 @@ internal readonly ref struct SQLiteParameterBinder
 internal readonly struct SQLiteParameterBinder
 #endif
 {
-    private readonly sqlite3_stmt stmt;
+    private readonly SQLiteStmt stmt;
 
-    public SQLiteParameterBinder(sqlite3_stmt stmt)
+    public SQLiteParameterBinder(SQLiteStmt stmt)
     {
         this.stmt = stmt;
     }
@@ -211,6 +222,32 @@ internal readonly struct SQLiteParameterBinder
     /// <param name="index">The parameter index to bind to, starting from 1.</param>
     /// <param name="value">The value to bind.</param>
     public void Text(int index, ReadOnlySpan<byte> value) => sqlite3_bind_text(stmt, index, value);
+
+    /// <summary>
+    /// Bind an object to a parameter as json using <see cref="Blob(int, ReadOnlySpan{byte})"/>.
+    /// </summary>
+    /// <typeparam name="T">The type of the value.</typeparam>
+    /// <remarks>Index starts from 1.</remarks>
+    /// <param name="index">The parameter index to bind to, starting from 1.</param>
+    /// <param name="value">The value to bind.</param>
+    public void JsonBlob<T>(int index, T value)
+    {
+        var json = JsonSerializer.SerializeToUtf8Bytes(value, stmt);
+        Blob(index, json);
+    }
+
+    /// <summary>
+    /// Bind an object to a parameter as json using <see cref="Text(int, ReadOnlySpan{byte})"/>>.
+    /// </summary>
+    /// <typeparam name="T">The type of the value.</typeparam>
+    /// <remarks>Index starts from 1.</remarks>
+    /// <param name="index">The parameter index to bind to, starting from 1.</param>
+    /// <param name="value">The value to bind.</param>
+    public void JsonText<T>(int index, T value)
+    {
+        var json = JsonSerializer.SerializeToUtf8Bytes(value, stmt);
+        Text(index, json);
+    }
 
     /// <summary>
     /// Bind an integer value to a parameter.
@@ -241,11 +278,11 @@ internal readonly ref struct SQLiteResultReader
 internal readonly struct SQLiteResultReader
 #endif
 {
-    private readonly sqlite3_stmt stmt;
+    private readonly SQLiteStmt stmt;
 
     public int Result { get; }
 
-    public SQLiteResultReader(sqlite3_stmt stmt, int result)
+    public SQLiteResultReader(SQLiteStmt stmt, int result)
     {
         this.stmt = stmt;
         Result = result;
@@ -290,16 +327,15 @@ internal readonly struct SQLiteResultReader
     /// </summary>
     /// <typeparam name="T">The type to deserialize the column value to.</typeparam>
     /// <param name="index">The column to read the value from, starting from 0.</param>
-    /// <param name="jsonOptions">The serializer options to use, or <c>null</c> for default options.</param>
     /// <returns>
     /// The column value deserialized as <typeparamref name="T"/>, or <c>null</c> if the value is <c>null</c>.
     /// </returns>
     /// <exception cref="JsonException">Thrown if the JSON is invalid.</exception>
     /// <exception cref="NotSupportedException">Thrown if the type is not supported.</exception>
-    public T? Deserialize<T>(int index, JsonSerializerOptions? jsonOptions = null)
+    public T? Deserialize<T>(int index)
     {
         var bytes = Blob(index);
-        var value = JsonSerializer.Deserialize<T>(bytes, jsonOptions);
+        var value = bytes.IsEmpty ? default : JsonSerializer.Deserialize<T>(bytes, stmt);
         return value;
     }
 
@@ -308,16 +344,15 @@ internal readonly struct SQLiteResultReader
     /// </summary>
     /// <remarks>Index starts from 0.</remarks>
     /// <param name="index">The column to read the value from, starting from 0.</param>
-    /// <param name="jsonOptions">The serializer options to use, or <c>null</c> for default options.</param>
     /// <returns>
     /// The column value deserialized as a <see cref="JsonDocument"/>, or <c>null</c> if the value is <c>null</c>.
     /// </returns>
     /// <exception cref="JsonException">Thrown if the JSON is invalid.</exception>
     /// <exception cref="NotSupportedException">Thrown if the type is not supported.</exception>
-    public JsonDocument? DeserializeDocument(int index, JsonSerializerOptions? jsonOptions = null)
+    public JsonDocument? DeserializeDocument(int index)
     {
         var bytes = Blob(index);
-        var value = JsonSerializer.Deserialize<JsonDocument>(bytes, jsonOptions);
+        var value = bytes.IsEmpty ? default : JsonSerializer.Deserialize<JsonDocument>(bytes, stmt);
         return value;
     }
 
@@ -326,16 +361,15 @@ internal readonly struct SQLiteResultReader
     /// </summary>
     /// <remarks>Index starts from 0.</remarks>
     /// <param name="index">The column to read the value from, starting from 0.</param>
-    /// <param name="jsonOptions">The serializer options to use, or <c>null</c> for default options.</param>
     /// <returns>
     /// The column value deserialized as a <see cref="JsonElement"/>, or <c>null</c> if the value is <c>null</c>.
     /// </returns>
     /// <exception cref="JsonException">Thrown if the JSON is invalid.</exception>
     /// <exception cref="NotSupportedException">Thrown if the type is not supported.</exception>
-    public JsonElement? DeserializeElement(int index, JsonSerializerOptions? jsonOptions = null)
+    public JsonElement? DeserializeElement(int index)
     {
         var bytes = Blob(index);
-        var value = JsonSerializer.Deserialize<JsonElement>(bytes, jsonOptions);
+        var value = bytes.IsEmpty ? default : JsonSerializer.Deserialize<JsonElement>(bytes, stmt);
         return value;
     }
 }

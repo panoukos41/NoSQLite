@@ -1,12 +1,9 @@
-﻿using System.Linq.Expressions;
-using System.Text.Json;
-
-namespace NoSQLite;
+﻿namespace NoSQLite;
 
 [Preserve(AllMembers = true)]
 public sealed class NoSQLiteTable : IDisposable
 {
-    private readonly List<IDisposable> disposables = new(6);
+    private readonly List<IDisposable> disposables = [];
     private readonly sqlite3 db;
 
     internal NoSQLiteTable(string table, NoSQLiteConnection connection)
@@ -27,7 +24,11 @@ public sealed class NoSQLiteTable : IDisposable
 
     public JsonSerializerOptions? JsonOptions => Connection.JsonOptions;
 
-    private SQLiteStmt CountStmt => field ??= new(db, disposables: disposables, sql: $"""
+    internal SQLiteStmt NewStmt(string sql) => new(db, JsonOptions, sql, disposables);
+
+    internal SQLiteStmt NewStmt(ReadOnlySpan<byte> sql) => new(db, JsonOptions, sql, disposables);
+
+    private SQLiteStmt CountStmt => field ??= NewStmt($"""
         SELECT count(*) FROM "{Table}"
         """);
 
@@ -36,27 +37,25 @@ public sealed class NoSQLiteTable : IDisposable
         return CountStmt.Execute(null, static r => r.Int(0));
     }
 
-    private SQLiteStmt LongCountStmt => field ??= new(db, disposables: disposables, sql: $"""
+    private SQLiteStmt LongCountStmt => field ??= NewStmt($"""
         SELECT count(*) FROM "{Table}"
         """);
 
     public long LongCount()
     {
-        var table = Table;
         return LongCountStmt.Execute(null, static r => r.Long(0));
     }
 
-    private SQLiteStmt AllStmt => field ??= new(db, disposables: disposables, sql: $"""
+    private SQLiteStmt AllStmt => field ??= NewStmt($"""
         SELECT "documents" FROM "{Table}"
         """);
 
     public T[] All<T>()
     {
-        var jsonOptions = JsonOptions;
-        return AllStmt.ExecuteMany(null, r => r.Deserialize<T>(0, jsonOptions)!);
+        return AllStmt.ExecuteMany(null, static r => r.Deserialize<T>(0)!);
     }
 
-    private SQLiteStmt ClearStmt => field ??= new(db, disposables: disposables, sql: $"""
+    private SQLiteStmt ClearStmt => field ??= NewStmt($"""
         DELETE FROM "{Table}"
         """);
 
@@ -65,14 +64,14 @@ public sealed class NoSQLiteTable : IDisposable
         ClearStmt.Execute(null);
     }
 
-    private SQLiteStmt ExistsStmt => field ??= new(db, disposables: disposables, sql: $"""
+    private SQLiteStmt ExistsStmt => field ??= NewStmt($"""
         SELECT count(*) FROM "{Table}"
         WHERE "documents"->('$.' || ?) = ?;
         """);
 
     public bool Exists<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
     {
-        var propertyPath = selector.GetPropertyPath();
+        var propertyPath = selector.GetPropertyPath(JsonOptions);
         var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
 
         return ExistsStmt.Execute(
@@ -85,7 +84,7 @@ public sealed class NoSQLiteTable : IDisposable
         );
     }
 
-    private SQLiteStmt FindStmt => field ??= new(db, disposables: disposables, sql: $"""
+    private SQLiteStmt FindStmt => field ??= NewStmt($"""
         SELECT "documents"
         FROM "{Table}"
         WHERE "documents"->('$.' || ?) = ?
@@ -93,29 +92,32 @@ public sealed class NoSQLiteTable : IDisposable
 
     public T Find<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
     {
-        var propertyPath = selector.GetPropertyPath();
+        var propertyPath = selector.GetPropertyPath(JsonOptions);
         var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
 
-        return FindStmt.Execute(
+        var found = FindStmt.Execute(
             b =>
             {
                 b.Text(1, propertyPath);
                 b.Text(2, jsonKey);
             },
-            r => r.Deserialize<T>(0, JsonOptions)!
+            static r => r.Deserialize<T>(0)
         );
+
+        NoSQLiteException.KeyNotFound(found, key);
+        return found;
     }
 
-    private SQLiteStmt FindPropertyStmt => field ??= new(db, disposables: disposables, sql: $"""
+    private SQLiteStmt FindPropertyStmt => field ??= NewStmt($"""
         SELECT "documents"->('$.' || ?)
         FROM "{Table}"
         WHERE "documents"->('$.' || ?) = ?
         """);
 
-    public TProperty FindProperty<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty>> propertySelector, TKey key)
+    public TProperty? FindProperty<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty?>> propertySelector, TKey key)
     {
-        var keyPropertyPath = keySelector.GetPropertyPath();
-        var propertyPath = propertySelector.GetPropertyPath();
+        var keyPropertyPath = keySelector.GetPropertyPath(JsonOptions);
+        var propertyPath = propertySelector.GetPropertyPath(JsonOptions);
         var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
 
         return FindPropertyStmt.Execute(
@@ -125,62 +127,125 @@ public sealed class NoSQLiteTable : IDisposable
                 b.Text(2, keyPropertyPath);
                 b.Text(3, jsonKey);
             },
-            r => r.Deserialize<TProperty>(0, JsonOptions)!
+            static r => r.Deserialize<TProperty>(0)
         );
     }
 
-    private SQLiteStmt InsertStmt => field ??= new(db, disposables: disposables, sql: $"""
-        INSERT INTO "{Table}"("documents") VALUES (?)
+    private SQLiteStmt AddStmt => field ??= NewStmt($"""
+        INSERT INTO "{Table}"("documents") VALUES (json(?))
         """);
 
-    public void Insert<T>(T obj)
+    public void Add<T>(T obj)
     {
         var document = JsonSerializer.SerializeToUtf8Bytes(obj, JsonOptions);
 
-        InsertStmt.Execute(b => b.Blob(1, document));
+        AddStmt.Execute(b => b.Blob(1, document));
     }
+
+    private SQLiteStmt UpdateStmt => field ??= NewStmt($"""
+        UPDATE "{Table}"
+        SET "documents" = json(?)
+        WHERE "documents"->('$.' || ?) = ?;
+        """);
 
     public void Update<T, TKey>(T document, Expression<Func<T, TKey>> selector)
     {
-        using var stmt = new SQLiteStmt(db, $"""
-            UPDATE "{Table}"
-            SET "documents" = ?
-            WHERE "documents"->('$.' || ?) = ?;
-            """);
-
-        var propertyPath = selector.GetPropertyPath();
+        var propertyPath = selector.GetPropertyPath(JsonOptions);
         var key = selector.Compile().Invoke(document);
-        var jsonDocument = JsonSerializer.SerializeToUtf8Bytes(document, JsonOptions);
-        var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
 
-        stmt.Execute(b =>
+        UpdateStmt.Execute(b =>
         {
-            b.Blob(1, jsonDocument);
+            b.JsonBlob(1, document);
             b.Text(2, propertyPath);
-            b.Text(3, jsonKey);
+            b.JsonText(3, key);
         });
     }
 
+    private SQLiteStmt RemoveStmt => field ??= NewStmt($"""
+        DELETE FROM "{Table}"
+        WHERE "documents"->('$.' || ?) = ?;
+        """);
+
     public void Remove<T, TKey>(Expression<Func<T, TKey>> selector, TKey key)
     {
-        using var stmt = new SQLiteStmt(db, $"""
-            DELETE FROM "{Table}"
-            WHERE "documents"->('$.' || ?) = ?;
-            """);
+        var propertyPath = selector.GetPropertyPath(JsonOptions);
 
-        var propertyPath = selector.GetPropertyPath();
-        var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
-
-        stmt.Execute(b =>
+        RemoveStmt.Execute(b =>
         {
             b.Text(1, propertyPath);
-            b.Text(2, jsonKey);
+            b.JsonText(2, key);
+        });
+    }
+
+    // https://sqlite.org/json1.html#jins
+    private SQLiteStmt InsertStmt => field ??= NewStmt($"""
+        UPDATE "{Table}"
+        SET "documents" = json_insert("documents", ('$.' || ?), json(?))
+        WHERE "documents"->('$.' || ?) = ?
+        """);
+
+    public void Insert<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty?>> propertySelector, TKey key, TProperty? value)
+    {
+        var keyPropertyPath = keySelector.GetPropertyPath(JsonOptions);
+        var propertyPath = propertySelector.GetPropertyPath(JsonOptions);
+
+        // cant know if it actaully inserted or not
+        InsertStmt.Execute(b =>
+        {
+            b.Text(1, propertyPath);
+            b.JsonBlob(2, value);
+            b.Text(3, keyPropertyPath);
+            b.JsonText(4, key);
+        });
+    }
+
+    // https://sqlite.org/json1.html#jins
+    private SQLiteStmt ReplaceStmt => field ??= NewStmt($"""
+        UPDATE "{Table}"
+        SET "documents" = json_replace("documents", ('$.' || ?), json(?))
+        WHERE "documents"->('$.' || ?) = ?
+        """);
+
+    public void Replace<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty?>> propertySelector, TKey key, TProperty? value)
+    {
+        var keyPropertyPath = keySelector.GetPropertyPath(JsonOptions);
+        var propertyPath = propertySelector.GetPropertyPath(JsonOptions);
+
+        // cant know if it actaully replaced or not
+        ReplaceStmt.Execute(b =>
+        {
+            b.Text(1, propertyPath);
+            b.JsonBlob(2, value);
+            b.Text(3, keyPropertyPath);
+            b.JsonText(4, key);
+        });
+    }
+
+    // https://sqlite.org/json1.html#jins
+    private SQLiteStmt SetStmt => field ??= NewStmt($"""
+        UPDATE "{Table}"
+        SET "documents" = json_set("documents", ('$.' || ?), json(?))
+        WHERE "documents"->('$.' || ?) = ?
+        """);
+
+    public void Set<T, TKey, TProperty>(Expression<Func<T, TKey>> keySelector, Expression<Func<T, TProperty?>> propertySelector, TKey key, TProperty? value)
+    {
+        var keyPropertyPath = keySelector.GetPropertyPath(JsonOptions);
+        var propertyPath = propertySelector.GetPropertyPath(JsonOptions);
+
+        // will set no matter what so failure will throw
+        SetStmt.Execute(b =>
+        {
+            b.Text(1, propertyPath);
+            b.JsonBlob(2, value);
+            b.Text(3, keyPropertyPath);
+            b.JsonText(4, key);
         });
     }
 
     public bool IndexExists(string indexName)
     {
-        using var stmt = new SQLiteStmt(db, """
+        using var stmt = new SQLiteStmt(db, JsonOptions, """
             SELECT name FROM "sqlite_master"
             WHERE type='index' AND name = ?;
             """u8);
@@ -192,10 +257,10 @@ public sealed class NoSQLiteTable : IDisposable
 
     public void CreateIndex<T, TKey>(Expression<Func<T, TKey>> selector, string indexName, bool unique = false)
     {
-        var propertyPath = selector.GetPropertyPath();
+        var propertyPath = selector.GetPropertyPath(JsonOptions);
 
         // can't use parameter (?) here so we have to create a new statement every time.
-        using var stmt = new SQLiteStmt(db, $"""
+        using var stmt = new SQLiteStmt(db, JsonOptions, $"""
             CREATE{(unique ? " UNIQUE" : "")} INDEX IF NOT EXISTS "{Table}_{indexName}"
             ON "{Table}" ("documents"->'$.{propertyPath}')
             """);
@@ -205,7 +270,7 @@ public sealed class NoSQLiteTable : IDisposable
 
     public bool DeleteIndex(string indexName)
     {
-        using var stmt = new SQLiteStmt(db, $"""
+        using var stmt = new SQLiteStmt(db, JsonOptions, $"""
             DROP INDEX "{Table}_{indexName}"
             """);
 

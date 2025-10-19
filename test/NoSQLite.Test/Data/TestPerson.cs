@@ -1,6 +1,4 @@
-﻿using Bogus;
-
-namespace NoSQLite.Test.Data;
+﻿namespace NoSQLite.Test.Data;
 
 public sealed record TestPerson
 {
@@ -15,6 +13,12 @@ public sealed record TestPerson
     public string Phone { get; set; } = string.Empty;
 
     public DateOnly Birthdate { get; set; }
+
+    public bool Sane { get; set; } = true;
+
+    public string? Nonce { get; set; }
+
+    public string? Nonce2 { get; set; }
 }
 
 public sealed class PersonFaker : Faker<TestPerson>

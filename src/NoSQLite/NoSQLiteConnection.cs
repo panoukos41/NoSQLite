@@ -1,4 +1,5 @@
-﻿using System.Buffers;
+﻿using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
@@ -39,7 +40,7 @@ public sealed partial class NoSQLiteConnection : IDisposable
         Version = sqlite3_libversion().utf8_to_string();
         JsonOptions = jsonOptions;
 
-        tableExistsStmt = new(() => new SQLiteStmt(db, """
+        tableExistsStmt = new(() => new SQLiteStmt(this.db, JsonOptions, """
             SELECT name FROM "sqlite_master"
             WHERE type='table' AND name = ?;
             """u8));
@@ -89,7 +90,7 @@ public sealed partial class NoSQLiteConnection : IDisposable
     /// <exception cref="Exception">Thrown if the table cannot be created.</exception>
     public void CreateTable(string table)
     {
-        using var stmt = new SQLiteStmt(db, $"""
+        using var stmt = new SQLiteStmt(db, JsonOptions, $"""
             CREATE TABLE IF NOT EXISTS "{table}" (
                 "documents" JSON NOT NULL
             );
@@ -104,7 +105,7 @@ public sealed partial class NoSQLiteConnection : IDisposable
     /// <exception cref="NoSQLiteException">Thrown if the table cannot be dropped.</exception>
     public void DropTable(string table)
     {
-        using var stmt = new SQLiteStmt(db, $"""
+        using var stmt = new SQLiteStmt(db, JsonOptions, $"""
             DROP TABLE IF EXISTS "{table}";
         """);
         stmt.Execute(b => b.Text(1, table));

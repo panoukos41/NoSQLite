@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace NoSQLite;
 
@@ -67,16 +68,16 @@ internal static class Extensions
     /// <param name="expression">An expression representing a property accessor, e.g., <c>x => x.Property</c>.</param>
     /// <returns>The name of the property accessed in the expression.</returns>
     /// <exception cref="ArgumentException">Thrown when the expression does not represent a property access.</exception>
-    public static string GetPropertyName<T, TKey>(this Expression<Func<T, TKey>> expression)
+    public static string GetPropertyName<T, TKey>(this Expression<Func<T, TKey>> expression, JsonSerializerOptions? jsonOptions)
     {
         if (expression.Body is MemberExpression memberExpression)
         {
-            return memberExpression.Member.Name;
+            return jsonOptions?.PropertyNamingPolicy?.ConvertName(memberExpression.Member.Name) ?? memberExpression.Member.Name;
         }
 
         if (expression.Body is UnaryExpression unaryExpression && unaryExpression.Operand is MemberExpression operand)
         {
-            return operand.Member.Name;
+            return jsonOptions?.PropertyNamingPolicy?.ConvertName(operand.Member.Name) ?? operand.Member.Name;
         }
 
         throw new ArgumentException("Invalid expression. Expected a property access expression.", nameof(expression));
@@ -90,7 +91,7 @@ internal static class Extensions
     /// <param name="expression">An expression representing a property accessor, e.g., <c>x => x.Nested.Property</c>.</param>
     /// <returns>The full path of the property accessed in the expression, e.g., "Nested.Property".</returns>
     /// <exception cref="ArgumentException">Thrown when the expression does not represent a property access.</exception>
-    public static string GetPropertyPath<T, TKey>(this Expression<Func<T, TKey>> expression)
+    public static string GetPropertyPath<T, TKey>(this Expression<Func<T, TKey>> expression, JsonSerializerOptions? jsonOptions)
     {
         static string BuildPath(Expression? expr)
         {
@@ -116,7 +117,7 @@ internal static class Extensions
             throw new ArgumentException("Invalid expression. Expected a property access expression.", nameof(expression));
         }
 
-        return path;
+        return jsonOptions?.PropertyNamingPolicy?.ConvertName(path) ?? path;
     }
 }
 

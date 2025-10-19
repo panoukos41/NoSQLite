@@ -20,7 +20,9 @@ public abstract class TestBase
 
     protected NoSQLiteConnection Connection { get; private set; } = null!;
 
-    private bool Delete { get; } = true;
+    protected virtual JsonSerializerOptions? JsonOptions { get; }
+
+    private bool Delete { get; } = false;
 
     [Before(HookType.Test)]
     public async Task BeforeAsync()
@@ -40,7 +42,7 @@ public abstract class TestBase
 
         Batteries_V2.Init();
         Db = sqlite3.Create(DbPath, useWal: true);
-        Connection = new NoSQLiteConnection(Db);
+        Connection = new NoSQLiteConnection(Db, JsonOptions);
 
         await That(File.Exists(DbPath)).IsTrue();
     }
