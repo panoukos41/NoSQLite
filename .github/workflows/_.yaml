@@ -1,0 +1,51 @@
+name: CI/CD
+env: { DOTNET_NOLOGO: true }
+on:
+  workflow_call:
+    inputs:
+      test: { type: boolean, default: false, description: Run tests. }
+      publish: { type: boolean, default: false, description: Publish to nuget. Will run all tests too. }
+    secrets:
+      nuget-key:
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Read .NET Version
+      shell: pwsh
+      id: dotnet-version
+      run: |
+        $version = (Get-Content .\global.json -Raw | ConvertFrom-Json).sdk.version.TrimEnd('0') + 'x'
+        "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with: { dotnet-version: "${{ steps.dotnet-version.outputs.version }}" }
+
+    - name: Build
+      working-directory: src
+      shell: pwsh
+      run: dotnet build NoSQLite -c Release
+
+    - name: Test
+      if: inputs.test || inputs.publish
+      working-directory: test
+      run: dotnet test --project NoSQLite.Test -c Release
+
+    - name: Pack
+      if: inputs.publish
+      working-directory: src
+      run: dotnet pack NoSQLite --no-restore --no-build
+
+    - name: Push
+      if: inputs.publish
+      working-directory: artifacts/src/package/release
+      env:
+        SOURCE_URL: https://api.nuget.org/v3/index.json
+        NUGET_AUTH_TOKEN: ${{ secrets.nuget-key }}
+      run: dotnet nuget push *.nupkg --skip-duplicate -s ${{ env.SOURCE_URL }} -k ${{ env.NUGET_AUTH_TOKEN }}

@@ -1,16 +1,20 @@
 # NoSQLite
 
-[![Release](https://github.com/panoukos41/NoSQLite/actions/workflows/release.yaml/badge.svg)](https://github.com/panoukos41/NoSQLite/actions/workflows/release.yaml)
-[![NuGet](https://buildstats.info/nuget/P41.NoSQLite?includePreReleases=true)](https://www.nuget.org/packages/P41.NoSQLite)
-[![MIT License](https://img.shields.io/apm/l/atomic-design-ui.svg?)](https://github.com/panoukos41/NoSQLite/blob/main/LICENSE.md)
+[![Build Action](https://github.com/panoukos41/NoSQLite/actions/workflows/build.yaml/badge.svg)](https://github.com/panoukos41/NoSQLite/actions/workflows/build.yaml)
+[![Publish Action](https://github.com/panoukos41/NoSQLite/actions/workflows/publish.yaml/badge.svg)](https://github.com/panoukos41/NoSQLite/actions/workflows/publish.yaml)
+[![Downloads](https://img.shields.io/nuget/dt/P41.NoSQLite.contracts?style=flat)](https://www.nuget.org/packages/P41.NoSQLite/)
 
-A C# library to use SQLite as a NoSQL database. This library aims to be simple low level methods that you can use to create your own data access layers.
+[![License](https://img.shields.io/github/license/panoukos41/NoSQLite?style=flat)](./LICENSE)
+[![.NET 8](https://img.shields.io/badge/.NET%208-%23512bd4?style=flat)](https://dotnet.microsoft.com)
+[![.NET 9](https://img.shields.io/badge/.NET%209-%23512bd4?style=flat)](https://dotnet.microsoft.com)
+[![.NET 10](https://img.shields.io/badge/.NET%2010-%23512bd4?style=flat)](https://dotnet.microsoft.com)
 
-> [!NOTE]  
-> The library is built using [`SQLitePCL.raw`](https://github.com/ericsink/SQLitePCL.raw).
+A C# library built using [`SQLitePCL.raw`](https://github.com/ericsink/SQLitePCL.raw) to use [SQLite](https://sqlite.org) as a [NoSQL](https://en.wikipedia.org/wiki/NoSQL) database.
+
+The library aims to provide simple low level methods that are used to create your own data access layers. For now the library uses a single `connection` class which creates/uses `tables` that have a single column called `documents`. In reality it should work for other tables with more columns as long as they contain one column called `documents` but no tests have been made or run for this use case.
 
 > [!IMPORTANT]  
-> To use the library you must ensure you are using an SQLite that contains the [`JSON1`](https://www.sqlite.org/json1.html) extension. The JSON functions and operators are built into SQLite by default, as of SQLite version 3.38.0 (2022-02-22)
+> To use the library you must ensure you are using an SQLite that contains the [`JSON1`](https://www.sqlite.org/json1.html) extension. As of version 3.38.0 (2022-02-22) the JSON functions and operators are built into SQLite by default.
 
 ## Getting Started
 

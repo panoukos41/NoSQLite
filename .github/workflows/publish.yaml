@@ -1,0 +1,19 @@
+name: publish
+env: { DOTNET_NOLOGO: true }
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    tags:
+    - v[0-9]+.[0-9]+.[0-9]+  # Only matches vX.X.X where X is a number
+    paths:
+    - src/**
+    - test/**
+jobs:
+  pipeline:
+    uses: panoukos41/NoSQLite/.github/workflows/_.yaml@main
+    with:
+      publish: true
+    secrets:
+      nuget-key: ${{ secrets.NUGET_API_KEY }}
