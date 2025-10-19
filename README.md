@@ -17,7 +17,7 @@ A C# library to use SQLite as a NoSQL database. This library aims to be simple l
 Install some version of [`SQLitePCL.raw`](https://github.com/ericsink/SQLitePCL.raw) to create your `sqlite3` object. 
 
 > [!TIP]  
-> You can look at the [test project](./test/NoSQLite.Test/) for more pragmatic usage. The project used `SQLitePCLRaw.bundle_e_sqlite3`.
+> You can look at the [test project](./test/NoSQLite.Test/) for more pragmatic usage. The test project uses [SQLitePCLRaw.bundle_e_sqlite3](https://www.nuget.org/packages/SQLitePCLRaw.bundle_e_sqlite3) nuget pacakge to use sqlite.
 
 ### Connection
 
@@ -27,7 +27,7 @@ Using your `sqlite3` db create a new instances of the `NoSQLiteConnection` and o
 > Once you use the connection be very careful on the consequences of switching your `JsonSerializerOptions` object.
 
 > [!Note]  
-> Disposing `NoSQLiteConnection will not close your `sqlite3` db or do anything with it. It will just cleanup after itself and it's associated tables and be ready to be discarded.
+> Disposing `NoSQLiteConnection` will not close your `sqlite3` db or do anything with it. It will just cleanup it's associated table and statement instances.
 
 ### Tables
 
@@ -35,8 +35,6 @@ You get a table using `connection.GetTable({TableName})`
 
 > [!NOTE]  
 > Tables are created if they do not exist. If you request a table multiple times you will always get the same table instance.
-
-### Document Management
 
 At the table level the following methods are supported:
 | Method | Description |
@@ -52,6 +50,8 @@ At the table level the following methods are supported:
 | IndexExists | Check if an index exists. |
 | CreateIndex | Creates an index if it does not exists using `"{TableName}_{IndexName}"` (can also set unique flag). |
 | DeleteIndex | Deletes an index if it does exist. |
+
+### Documents
 
 At the document level the following methods are supported:
 | Method | Description |
