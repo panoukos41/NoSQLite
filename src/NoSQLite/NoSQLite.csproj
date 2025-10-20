@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>True</IsPackable>
+    <RootNamesapce>NoSQLite</RootNamesapce>
+    <AssemblyName>P41.NoSQLite</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
