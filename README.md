@@ -1,81 +1,79 @@
-## NoSQLite: NoSQL on top of SQLite
+# NoSQLite
 
-[![Release](https://github.com/panoukos41/NoSQLite/actions/workflows/release.yaml/badge.svg)](https://github.com/panoukos41/NoSQLite/actions/workflows/release.yaml)
-[![NuGet](https://buildstats.info/nuget/P41.NoSQLite?includePreReleases=true)](https://www.nuget.org/packages/P41.NoSQLite)
-[![MIT License](https://img.shields.io/apm/l/atomic-design-ui.svg?)](https://github.com/panoukos41/NoSQLite/blob/main/LICENSE.md)
+[![Build Action](https://github.com/panoukos41/NoSQLite/actions/workflows/build.yaml/badge.svg)](https://github.com/panoukos41/NoSQLite/actions/workflows/build.yaml)
+[![Publish Action](https://github.com/panoukos41/NoSQLite/actions/workflows/publish.yaml/badge.svg)](https://github.com/panoukos41/NoSQLite/actions/workflows/publish.yaml)
+[![Downloads](https://img.shields.io/nuget/dt/P41.NoSQLite.contracts?style=flat)](https://www.nuget.org/packages/P41.NoSQLite/)
 
-A thin wrapper above sqlite using the [`JSON1`](https://www.sqlite.org/json1.html) apis turn it into a [`NOSQL`](https://en.wikipedia.org/wiki/NoSQL) database.
+[![License](https://img.shields.io/github/license/panoukos41/NoSQLite?style=flat)](./LICENSE)
+[![.NET 8](https://img.shields.io/badge/.NET%208-%23512bd4?style=flat)](https://dotnet.microsoft.com)
+[![.NET 9](https://img.shields.io/badge/.NET%209-%23512bd4?style=flat)](https://dotnet.microsoft.com)
+[![.NET 10](https://img.shields.io/badge/.NET%2010-%23512bd4?style=flat)](https://dotnet.microsoft.com)
 
-This library references and uses [`SQLitePCLRaw.bundle_e_sqlite3`](https://www.nuget.org/packages/SQLitePCLRaw.bundle_e_sqlite3) version `2.1.2` and later witch ensures that the [`JSON1 APIS`](https://www.sqlite.org/json1.html) are present.
+A C# library built using [`SQLitePCL.raw`](https://github.com/ericsink/SQLitePCL.raw) to use [SQLite](https://sqlite.org) as a [NoSQL](https://en.wikipedia.org/wiki/NoSQL) database.
 
-The library executes `Batteries.Init();` for you when a connection is first initialized.
+The library aims to provide simple low level methods that are used to create your own data access layers. For now the library uses a single `connection` class which creates/uses `tables` that have a single column called `documents`. In reality it should work for other tables with more columns as long as they contain one column called `documents` but no tests have been made or run for this use case.
+
+> [!IMPORTANT]  
+> To use the library you must ensure you are using an SQLite that contains the [`JSON1`](https://www.sqlite.org/json1.html) extension. As of version 3.38.0 (2022-02-22) the JSON functions and operators are built into SQLite by default.
 
 ## Getting Started
 
-Create an instance of `NoSQLiteConnection`.
-```csharp
-var connection = new NoSQLiteConnection(
-    "path to database file", // Required
-    json_options)            // Optional JsonSerializerOptions
-```
+Install some version of [`SQLitePCL.raw`](https://github.com/ericsink/SQLitePCL.raw) to create your `sqlite3` object. 
 
-The connection configures the `PRAGMA journal_mode` to be [`WAL`](https://www.sqlite.org/wal.html)
+> [!TIP]  
+> You can look at the [test project](./test/NoSQLite.Test/) for more pragmatic usage. The test project uses [SQLitePCLRaw.bundle_e_sqlite3](https://www.nuget.org/packages/SQLitePCLRaw.bundle_e_sqlite3) nuget pacakge to use sqlite.
 
-The connection manages an `sqlite3` object when initialized. *You should always dispose it when you are done so that the databases flashes `WAL` files* but you can also ignore it ¯\ (ツ)/¯.
+### Connection
 
-## Tables
+Using your `sqlite3` db create a new instances of the `NoSQLiteConnection` and optionally pass a `JsonSerializerOptions` object.
 
-You get a table using `connection.GetTable()` you can optionaly provide a table name or leave it as it is to get the default `documents` table.
-> Tables are created if they do not exist.
+> [!CAUTION]  
+> Once you use the connection be very careful on the consequences of switching your `JsonSerializerOptions` object.
 
-Tables are managed by their connections so you don't have to worry about disposing. If you request a table multiple times *(eg: the same name)* you will always get the same `Instance`.
+> [!Note]  
+> Disposing `NoSQLiteConnection` will not close your `sqlite3` db or do anything with it. It will just cleanup it's associated table and statement instances.
 
-## Document Management
+### Tables
 
-Example class that will be used below:
-```csharp
-public class Person
-{
-    public string Name { get; set; }
-    public string Surname { get; set; }
-    public string? Description { get; set; }
-}
-```
-```csharp
-var connection = new NoSQLiteConnection("path to database file", "json options or null");
-```
-```csharp
-var docs = connection.GetTable();
-```
+You get a table using `connection.GetTable({TableName})`
 
-### Create/Update documents.
+> [!NOTE]  
+> Tables are created if they do not exist. If you request a table multiple times you will always get the same table instance.
 
-Creating or Updating a document happens from the same `Insert` method, keep in mind that this always replaces the document with the new one.
-```csharp
-var panos = new Person
-{
-    Name = "panoukos",
-    Surname = "41",
-    Description = "C# dev"
-}
+At the table level the following methods are supported:
+| Method | Description |
+|- |- |
+| Count/CountLong | Returns the number of rows in the table. |
+| All | Returns all rows in the table. Deserialized to `T` |
+| Clear | Clears the table. |
+| Exists | Check if a document exists. |
+| Find | Returns the document if it exists or throws. |
+| Add | Adds a document. |
+| Update | Updates a document (replace). |
+| Delete | Deletes a document. |
+| IndexExists | Check if an index exists. |
+| CreateIndex | Creates an index if it does not exists using `"{TableName}_{IndexName}"` (can also set unique flag). |
+| DeleteIndex | Deletes an index if it does exist. |
 
-docs.Insert("panos", panos); // If it exists it is now replaced/updated.
-```
+### Documents
 
-### Get documents.
-```csharp
-var doc = docs.Get<Person>("panos"); // Get the document or null.
-```
+At the document level the following methods are supported:
+| Method | Description |
+|- |- |
+| FindProperty | Finds a document by key and returns a property value. |
+| Insert | Inserts a property value into a document by key. Overwrite `NO`, Create `YES`. |
+| Replace | Replaces a property value in a document by key. Overwrite `YES`, Create `NO`. |
+| Set | Sets a property value in a document by key. Overwrite `YES`, Create `YES`. |
 
-#### Delete documents.
-```csharp
-docs.Remove("panos"); // Will remove the document.
-docs.Remove("panos"); // Will still succeed even if the document doesn't exist.
-```
+### Examples
+
+- For connection creation look at the [TestBase Before and After methods of the _setup.cs file](./test/NoSQLite.Test/_setup.cs).
+- For CRUD examples look at the [CRUD method of the Table.cs file](./test/NoSQLite.Test/Table.cs).
+- For INDEX examples look at the [Index and Index_Unique methods of the Table.cs file](./test/NoSQLite.Test/Table.cs).
 
 ## Build
 
-To build this project [.NET 7](https://dotnet.microsoft.com/en-us/download/dotnet/7.0) is needed.
+To build this project [.NET 10](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) is needed.
 
 ## Contribute
 

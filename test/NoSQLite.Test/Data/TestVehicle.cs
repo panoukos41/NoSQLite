@@ -1,5 +1,5 @@
 ﻿namespace NoSQLite.Test.Data;
 
-public sealed record Vehicle
+public sealed record TestVehicle
 {
 }

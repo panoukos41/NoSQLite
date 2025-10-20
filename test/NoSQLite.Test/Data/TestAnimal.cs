@@ -6,6 +6,6 @@ using System.Threading.Tasks;
 
 namespace NoSQLite.Test.Data;
 
-public sealed record Faction
+public sealed record TestAnimal
 {
 }
