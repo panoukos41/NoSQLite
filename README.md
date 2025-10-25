@@ -2,7 +2,7 @@
 
 [![Build Action](https://github.com/panoukos41/NoSQLite/actions/workflows/build.yaml/badge.svg)](https://github.com/panoukos41/NoSQLite/actions/workflows/build.yaml)
 [![Publish Action](https://github.com/panoukos41/NoSQLite/actions/workflows/publish.yaml/badge.svg)](https://github.com/panoukos41/NoSQLite/actions/workflows/publish.yaml)
-[![Downloads](https://img.shields.io/nuget/dt/P41.NoSQLite.contracts?style=flat)](https://www.nuget.org/packages/P41.NoSQLite/)
+[![Downloads](https://img.shields.io/nuget/vpre/P41.NoSQLite)](https://www.nuget.org/packages/P41.NoSQLite)
 
 [![License](https://img.shields.io/github/license/panoukos41/NoSQLite?style=flat)](./LICENSE)
 [![.NET 8](https://img.shields.io/badge/.NET%208-%23512bd4?style=flat)](https://dotnet.microsoft.com)
