@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 
 namespace NoSQLite;
 
@@ -153,6 +154,31 @@ public sealed class NoSQLiteTable
 
         NoSQLiteException.KeyNotFound(found, key);
         return found;
+    }
+
+    /// <summary>
+    /// Attempts to find and return a document by key.
+    /// </summary>
+    /// <typeparam name="T">The document type.</typeparam>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <param name="selector">An expression selecting the key property.</param>
+    /// <param name="key">The key value to search for.</param>
+    /// <param name="value">When this method returns, contains the found document if it exists; otherwise, <c>null</c>.</param>
+    /// <returns><see langword="true"/> if a document with the specified key was found; otherwise, <see langword="false"/>.</returns>
+    public bool TryFind<T, TKey>(Expression<Func<T, TKey>> selector, TKey key, [NotNullWhen(true)] out T? value)
+    {
+        var propertyPath = selector.GetPropertyPath(JsonOptions);
+        var jsonKey = JsonSerializer.SerializeToUtf8Bytes(key, JsonOptions);
+
+        value = FindStmt.Execute(
+            b =>
+            {
+                b.Text(1, propertyPath);
+                b.Text(2, jsonKey);
+            },
+            static r => r.Deserialize<T>(0)
+        );
+        return value is { };
     }
 
     private SQLiteStmt FindPropertyStmt => field ??= NewStmt($"""

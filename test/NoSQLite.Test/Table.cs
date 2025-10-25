@@ -42,6 +42,8 @@ public sealed class Table : TestBase
 
         // Find
         await That(() => table.Find<TestPerson, int>(p => p.Id, 15)).Throws<NoSQLiteException>().WithInnerException().And.IsTypeOf<KeyNotFoundException>();
+        await That(() => table.TryFind<TestPerson, int>(p => p.Id, 15, out _)).IsFalse();
+        await That(() => table.TryFind<TestPerson, int>(p => p.Id, id, out _)).IsTrue();
         var person5 = await That(table.Find<TestPerson, int>(p => p.Id, id)).IsNotNull();
 
         // Update
